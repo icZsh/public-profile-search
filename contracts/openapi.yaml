@@ -1,0 +1,755 @@
+openapi: 3.1.0
+info:
+  title: Public Profile Search Prototype API
+  version: 0.2.0
+  description: >-
+    Local-only contract for an eligibility-gated, deterministic Fast Brief.
+    The only live adapter is a GitHub direct-profile provider authorized by the
+    project owner for limited local evaluation. It is not approved for MVP,
+    shared use, bulk collection, or production deployment.
+servers:
+  - url: http://localhost:8800
+tags:
+  - name: Health
+  - name: Eligibility
+  - name: Jobs
+  - name: Local administration
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      operationId: healthz
+      responses:
+        "200":
+          description: Process is alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status:
+                    const: ok
+  /readyz:
+    get:
+      tags: [Health]
+      operationId: readyz
+      responses:
+        "200":
+          description: Database is reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/prototype-config:
+    get:
+      tags: [Jobs]
+      operationId: getPrototypeConfig
+      description: >-
+        Returns the synthetic-demo configuration and the current live-provider
+        availability flag. This endpoint is local-prototype plumbing, not a
+        production configuration API.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Local prototype configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrototypeConfig"
+        "401":
+          $ref: "#/components/responses/Error"
+  /v1/eligibility-verifications:
+    post:
+      tags: [Eligibility]
+      operationId: createEligibilityVerification
+      description: >-
+        Starts proof of control for one direct public GitHub profile URL. The
+        returned challenge is shown once and must be placed temporarily in that
+        profile's public bio. Control proof alone does not establish adult or
+        approved public-professional scope.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEligibilityVerificationRequest"
+      responses:
+        "201":
+          description: Verification created; the response may contain the one-time challenge.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EligibilityVerification"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/eligibility-verifications/{verification_id}:
+    parameters:
+      - $ref: "#/components/parameters/VerificationId"
+    get:
+      tags: [Eligibility]
+      operationId: getEligibilityVerification
+      description: Returns the owner-visible verification state; never replays the challenge.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Owner-visible eligibility state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EligibilityVerification"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/eligibility-verifications/{verification_id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/VerificationId"
+    post:
+      tags: [Eligibility]
+      operationId: completeEligibilityVerification
+      description: >-
+        Safely fetches the allowlisted GitHub user record and checks the public
+        bio for the challenge in memory. A successful check moves the request to
+        review_pending; it does not issue eligibility automatically.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Current verification state after the control check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EligibilityVerification"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "410":
+          $ref: "#/components/responses/Error"
+        "429":
+          description: Cooldown or GitHub rate limit; may include Retry-After.
+          headers:
+            Retry-After:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/prototype/eligibility-verifications/{verification_id}:
+    parameters:
+      - $ref: "#/components/parameters/VerificationId"
+    get:
+      tags: [Local administration]
+      operationId: getAdminEligibilityVerification
+      description: >-
+        Restricted local review summary. It reveals the canonical public profile
+        URL to the operator but does not return the transient bio or challenge.
+      security:
+        - prototypeAdminAuth: []
+      responses:
+        "200":
+          description: Operator review summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminEligibilityVerification"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/prototype/eligibility-verifications/{verification_id}/decision:
+    parameters:
+      - $ref: "#/components/parameters/VerificationId"
+    post:
+      tags: [Local administration]
+      operationId: decideEligibilityVerification
+      description: >-
+        Records the local operator's separate adult/public-professional scope
+        decision. Approval is valid for 24 hours under the default local policy.
+      security:
+        - prototypeAdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EligibilityDecisionRequest"
+      responses:
+        "200":
+          description: Decision recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EligibilityVerification"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /v1/search-jobs:
+    post:
+      tags: [Jobs]
+      operationId: createSearchJob
+      description: >-
+        Creates a deterministic brief job only when the supplied eligibility
+        reference belongs to the same owner, canonical profile, provider,
+        purpose, and policy version and has not expired or been revoked.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSearchJobRequest"
+      responses:
+        "202":
+          description: Job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchJob"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/search-jobs/{job_id}:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+      - $ref: "#/components/parameters/PrototypeUser"
+    get:
+      tags: [Jobs]
+      operationId: getSearchJob
+      security:
+        - prototypeAuth: []
+      responses:
+        "200":
+          description: Owner-visible job state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchJob"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Jobs]
+      operationId: deleteSearchJob
+      security:
+        - prototypeAuth: []
+      responses:
+        "204":
+          description: Per-job data removed and a resurrection tombstone written.
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/search-jobs/{job_id}/events:
+    get:
+      tags: [Jobs]
+      operationId: streamSearchJobEvents
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+        - name: last_event_id
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: Last-Event-ID
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream of safe, replayable JobEvent objects.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            X-Robots-Tag:
+              schema:
+                type: string
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/search-jobs/{job_id}/brief:
+    get:
+      tags: [Jobs]
+      operationId: getFastBrief
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Deterministic Fast Brief.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FastBrief"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /v1/search-jobs/{job_id}/evidence:
+    get:
+      tags: [Jobs]
+      operationId: getEvidence
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Display-approved evidence for the current report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/prototype/suppressions:
+    post:
+      tags: [Local administration]
+      operationId: suppressPrototypeSubject
+      security:
+        - prototypeAdminAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuppressionRequest"
+      responses:
+        "204":
+          description: Subject suppressed and matching reports revoked.
+        "401":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    prototypeAuth:
+      type: apiKey
+      in: header
+      name: X-Prototype-Token
+      description: Local-only prototype token; never a production authentication mechanism.
+    prototypeAdminAuth:
+      type: apiKey
+      in: header
+      name: X-Prototype-Admin-Token
+      description: Separate local-only operator token; never expose it to the browser.
+  parameters:
+    PrototypeUser:
+      name: X-Prototype-User
+      in: header
+      required: true
+      description: Local owner UUID paired with the prototype token.
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    VerificationId:
+      name: verification_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Error:
+      description: Safe machine-readable error with no profile content.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+    PrototypeConfig:
+      type: object
+      additionalProperties: false
+      required:
+        - fixture_url
+        - eligibility_reference_id
+        - purpose
+        - attestation_policy_version
+        - allowed_profile_hosts
+        - github_provider_enabled
+      properties:
+        fixture_url:
+          type: string
+          format: uri
+        eligibility_reference_id:
+          type: string
+          format: uuid
+        purpose:
+          const: self_audit
+        attestation_policy_version:
+          type: string
+        allowed_profile_hosts:
+          type: array
+          items:
+            type: string
+          const: [github.com]
+        github_provider_enabled:
+          type: boolean
+    CreateEligibilityVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [profile_url, purpose]
+      properties:
+        profile_url:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 300
+          description: Direct https://github.com/{login} profile URL; no query or fragment.
+        purpose:
+          const: self_audit
+    EligibilityVerification:
+      type: object
+      additionalProperties: false
+      required:
+        - verification_id
+        - status
+        - purpose
+        - provider_id
+        - canonical_profile_url
+        - policy_version
+        - challenge_value
+        - challenge_expires_at
+        - review_expires_at
+        - eligibility_reference_id
+        - eligibility_expires_at
+        - attempts_remaining
+        - message
+      properties:
+        verification_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending_control, review_pending, eligible, expired, unavailable]
+        purpose:
+          const: self_audit
+        provider_id:
+          const: github_public_profile_v1
+        canonical_profile_url:
+          type: string
+          format: uri
+        policy_version:
+          type: string
+        challenge_value:
+          type: [string, "null"]
+          description: Returned only when a verification is created; stored server-side as an HMAC.
+        challenge_expires_at:
+          type: [string, "null"]
+          format: date-time
+        review_expires_at:
+          type: [string, "null"]
+          format: date-time
+        eligibility_reference_id:
+          type: [string, "null"]
+          format: uuid
+          description: Present only while status is eligible.
+        eligibility_expires_at:
+          type: [string, "null"]
+          format: date-time
+        attempts_remaining:
+          type: integer
+          minimum: 0
+        message:
+          type: [string, "null"]
+    EligibilityDecisionRequest:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [decision, review_code, reviewer_id]
+          properties:
+            decision:
+              const: approve
+            review_code:
+              const: adult_public_professional_context_confirmed
+            reviewer_id:
+              $ref: "#/components/schemas/ReviewerId"
+        - type: object
+          additionalProperties: false
+          required: [decision, review_code, reviewer_id]
+          properties:
+            decision:
+              const: deny
+            review_code:
+              const: unable_to_confirm_scope
+            reviewer_id:
+              $ref: "#/components/schemas/ReviewerId"
+    ReviewerId:
+      type: string
+      minLength: 3
+      maxLength: 80
+      pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    AdminEligibilityVerification:
+      type: object
+      additionalProperties: false
+      required:
+        - verification_id
+        - canonical_profile_url
+        - provider_id
+        - purpose
+        - internal_state
+        - control_verified_at
+        - review_expires_at
+        - policy_version
+      properties:
+        verification_id:
+          type: string
+          format: uuid
+        canonical_profile_url:
+          type: string
+          format: uri
+        provider_id:
+          type: string
+        purpose:
+          type: string
+        internal_state:
+          type: string
+        control_verified_at:
+          type: [string, "null"]
+          format: date-time
+        review_expires_at:
+          type: [string, "null"]
+          format: date-time
+        policy_version:
+          type: string
+    CreateSearchJobRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - profile_url
+        - purpose
+        - target_relationship
+        - eligibility_reference_id
+        - attestation_policy_version
+        - locale
+      properties:
+        profile_url:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 300
+        purpose:
+          const: self_audit
+        target_relationship:
+          const: self
+        eligibility_reference_id:
+          type: string
+          format: uuid
+        attestation_policy_version:
+          type: string
+        locale:
+          type: string
+          enum: [en, zh-CN]
+    SearchJob:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - collection_cutoff_at
+        - fallback_at
+        - deadline_at
+        - events_url
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+            - running
+            - finalizing
+            - complete
+            - partial
+            - insufficient_evidence
+            - result_unavailable
+            - service_error
+            - cancelled
+        collection_cutoff_at:
+          type: string
+          format: date-time
+        fallback_at:
+          type: string
+          format: date-time
+        deadline_at:
+          type: string
+          format: date-time
+        events_url:
+          type: string
+    Claim:
+      type: object
+      additionalProperties: false
+      required: [claim_id, predicate, label, value, confidence, evidence_ids]
+      properties:
+        claim_id:
+          type: string
+          format: uuid
+        predicate:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low, unknown]
+        evidence_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FastBrief:
+      type: object
+      additionalProperties: false
+      required: [job_id, subject, summary, claims, limitations, generated_at]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        summary:
+          type: string
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/Claim"
+        limitations:
+          type: array
+          items:
+            type: string
+        generated_at:
+          type: string
+          format: date-time
+    EvidenceItem:
+      type: object
+      additionalProperties: false
+      required: [evidence_id, source_type, title, url, excerpt, retrieved_at]
+      properties:
+        evidence_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        excerpt:
+          type: string
+        retrieved_at:
+          type: string
+          format: date-time
+    EvidenceList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceItem"
+    SuppressionRequest:
+      type: object
+      additionalProperties: false
+      required: [profile_url]
+      properties:
+        profile_url:
+          type: string
+          format: uri
+          minLength: 1
+          maxLength: 300
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string

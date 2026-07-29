@@ -1,0 +1,23 @@
+{
+  "provider_id": "fixture_linked_v1",
+  "status": "success",
+  "documents": [
+    {
+      "canonical_url": "https://code.example.test/alex-chen",
+      "publisher": "Synthetic Code",
+      "title": "Alex Chen — synthetic code profile",
+      "lineage_key": "synthetic-code:alex-chen",
+      "source_type": "first_party_linked_profile",
+      "trust_class": "self_reported",
+      "excerpt": "Alex Chen. This synthetic code profile links back to the originating profile.",
+      "span_locator": {
+        "field": "profile_bio"
+      },
+      "extracted_fields": {
+        "display_name": "Alex Chen",
+        "links_back_to": "https://profiles.example.test/alex-chen"
+      }
+    }
+  ]
+}
+

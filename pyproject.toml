@@ -1,0 +1,46 @@
+[project]
+name = "public-profile-search"
+version = "0.2.0"
+description = "Local eligibility-gated prototype for an evidence-backed public profile brief."
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "alembic>=1.15,<2",
+  "celery[redis]>=5.4,<6",
+  "cryptography>=45,<47",
+  "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic-settings>=2.7,<3",
+  "pyyaml>=6,<7",
+  "sqlalchemy>=2.0,<3",
+  "sse-starlette>=2.2,<4",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.9,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["apps/api/tests", "workers/tests"]
+markers = [
+  "integration: requires PostgreSQL and Redis",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"apps/api/app/api/*.py" = ["B008"]

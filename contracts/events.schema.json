@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://public-profile-search.example/contracts/events.schema.json",
+  "title": "JobEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["job_id", "sequence", "type", "message", "created_at"],
+  "properties": {
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "type": {
+      "enum": [
+        "job_queued",
+        "collection_started",
+        "source_completed",
+        "finalization_started",
+        "brief_ready",
+        "insufficient_evidence",
+        "job_cancelled",
+        "result_unavailable",
+        "job_deleted"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "terminal": {
+      "type": "boolean",
+      "default": false
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
+

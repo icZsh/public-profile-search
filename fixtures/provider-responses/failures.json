@@ -1,0 +1,17 @@
+{
+  "scenarios": [
+    {
+      "status": "timeout",
+      "error_code": "fixture_timeout"
+    },
+    {
+      "status": "rate_limited",
+      "error_code": "fixture_rate_limited"
+    },
+    {
+      "status": "invalid_response",
+      "error_code": "fixture_invalid_response"
+    }
+  ]
+}
+

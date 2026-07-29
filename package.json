@@ -1,0 +1,18 @@
+{
+  "name": "public-profile-search",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.7",
+  "workspaces": [
+    "apps/web",
+    "packages/generated-api-client"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @public-profile-search/web run dev",
+    "build:web": "npm --workspace @public-profile-search/web run build",
+    "lint:web": "npm --workspace @public-profile-search/web run lint",
+    "typecheck:web": "npm --workspace @public-profile-search/web run typecheck",
+    "test:web": "npm --workspace @public-profile-search/web run test"
+  }
+}
+

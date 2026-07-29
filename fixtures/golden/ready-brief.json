@@ -1,0 +1,23 @@
+{
+  "subject": "Alex Chen",
+  "summary": "The synthetic source set supports the public display name Alex Chen and an explicitly linked synthetic code profile.",
+  "claims": [
+    {
+      "predicate": "identity.public_display_name",
+      "label": "Public display name",
+      "value": "Alex Chen",
+      "confidence": "high"
+    },
+    {
+      "predicate": "account.explicitly_linked_public_profile",
+      "label": "Explicitly linked public profile",
+      "value": "https://code.example.test/alex-chen",
+      "confidence": "high"
+    }
+  ],
+  "limitations": [
+    "This brief uses synthetic fixtures and does not describe a real person.",
+    "It confirms explicit links only; it is not a real-world identity verification."
+  ]
+}
+
