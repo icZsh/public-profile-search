@@ -693,7 +693,20 @@ def _combined_usage(
         input_tokens=total.input_tokens + current.input_tokens,
         output_tokens=total.output_tokens + current.output_tokens,
         total_tokens=total.total_tokens + current.total_tokens,
+        reasoning_tokens=_combined_optional(total.reasoning_tokens, current.reasoning_tokens),
+        cached_input_tokens=_combined_optional(
+            total.cached_input_tokens,
+            current.cached_input_tokens,
+        ),
     )
+
+
+def _combined_optional(total: int | None, current: int | None) -> int | None:
+    if total is None:
+        return current
+    if current is None:
+        return total
+    return total + current
 
 
 def _outcome_with_usage(

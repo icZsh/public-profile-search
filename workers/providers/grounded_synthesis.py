@@ -712,6 +712,12 @@ class SynthesisUsage:
     input_tokens: int
     output_tokens: int
     total_tokens: int
+    # `max_output_tokens` budgets reasoning and visible output together, so the
+    # reasoning split is what tells us how much headroom the cap actually has.
+    # Cached input tokens show whether the static system prompt is being reused
+    # across attempts and jobs. Both are absent on gateways that omit details.
+    reasoning_tokens: int | None = None
+    cached_input_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -1607,7 +1613,15 @@ def _parse_usage(value: object) -> SynthesisUsage | None:
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
+        reasoning_tokens=_detail_int(value.get("output_tokens_details"), "reasoning_tokens"),
+        cached_input_tokens=_detail_int(value.get("input_tokens_details"), "cached_tokens"),
     )
+
+
+def _detail_int(value: object, key: str) -> int | None:
+    if not isinstance(value, dict):
+        return None
+    return _nonnegative_int(value.get(key))
 
 
 def _nonnegative_int(value: object) -> int | None:

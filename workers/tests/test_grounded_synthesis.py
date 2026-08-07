@@ -486,6 +486,48 @@ def test_evidence_packet_budget_is_tight_at_every_truncation_boundary(max_chars)
         assert len(one_more.model_dump_json(exclude_none=False)) > source_budget
 
 
+def test_usage_captures_reasoning_and_cached_token_details():
+    # `max_output_tokens` budgets reasoning and visible output together, so the
+    # reasoning split has to survive into the persisted usage record.
+    payload = _api_payload(_valid_output())
+    payload["usage"] = {
+        "input_tokens": 1_200,
+        "output_tokens": 900,
+        "total_tokens": 2_100,
+        "input_tokens_details": {"cached_tokens": 1_024},
+        "output_tokens_details": {"reasoning_tokens": 640},
+    }
+
+    outcome = request_grounded_synthesis(
+        packet=_packet(),
+        api_key="test-api-key",
+        reasoning_effort="medium",
+        max_output_tokens=2_500,
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)),
+    )
+
+    assert outcome.usage is not None
+    assert outcome.usage.reasoning_tokens == 640
+    assert outcome.usage.cached_input_tokens == 1_024
+
+
+def test_usage_details_are_optional_when_the_gateway_omits_them():
+    outcome = request_grounded_synthesis(
+        packet=_packet(),
+        api_key="test-api-key",
+        reasoning_effort="medium",
+        max_output_tokens=2_500,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json=_api_payload(_valid_output()))
+        ),
+    )
+
+    assert outcome.usage is not None
+    assert outcome.usage.total_tokens == 200
+    assert outcome.usage.reasoning_tokens is None
+    assert outcome.usage.cached_input_tokens is None
+
+
 def test_output_schema_is_strict_and_requires_grounding_for_summary():
     schema = grounded_synthesis_json_schema()
 

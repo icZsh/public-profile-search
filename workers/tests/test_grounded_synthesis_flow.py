@@ -371,6 +371,8 @@ def test_synthesis_service_materializes_sources_calls_runner_and_persists(monkey
             "input_tokens": 120,
             "output_tokens": 80,
             "total_tokens": 200,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
         }
         assert result.input_checksum == "f" * 64
         assert observation is not None
@@ -456,6 +458,8 @@ def test_synthesis_retries_transient_openrouter_failure_and_aggregates_usage(
             "input_tokens": 200,
             "output_tokens": 80,
             "total_tokens": 280,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
         }
 
 
@@ -524,6 +528,8 @@ def test_synthesis_exhausts_transient_retries_before_persisting_fallback(
             "input_tokens": 30,
             "output_tokens": 15,
             "total_tokens": 45,
+            "reasoning_tokens": None,
+            "cached_input_tokens": None,
         }
         assert provider_attempt_count == 1
 
