@@ -78,18 +78,17 @@ def eligible_anchor_candidate_ids(
     # anchor when ordering its hypotheses.
     from apps.api.app.services.professional_search_scheduling import (
         derive_professional_name_hypotheses,
+        effective_adaptive_professional_search_policy,
     )
 
-    maximum_names = _bounded_int(
-        getattr(settings, "adaptive_professional_search_max_names", 4),
-        default=4,
-        minimum=1,
-        maximum=6,
+    policy = effective_adaptive_professional_search_policy(
+        settings=settings,
+        search_mode=job.search_mode,
     )
     hypotheses = derive_professional_name_hypotheses(
         session,
         job=job,
-        maximum_names=max(2, maximum_names),
+        maximum_names=max(2, policy.maximum_names),
         include_context_anchors=False,
     )
     return frozenset(
@@ -257,11 +256,3 @@ def select_footprint_anchor(
         settings=settings,
     )
     return job, candidate
-
-
-def _bounded_int(value: object, *, default: int, minimum: int, maximum: int) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = default
-    return min(maximum, max(minimum, parsed))

@@ -470,7 +470,7 @@ def test_footprint_job_discovers_candidates_progressively(
     }
 
 
-def test_deep_footprint_job_reuses_quick_catalog_and_preserves_mode(
+def test_deep_footprint_job_uses_deep_catalog_and_preserves_mode(
     client,
     app,
     auth_headers,
@@ -485,8 +485,8 @@ def test_deep_footprint_job_reuses_quick_catalog_and_preserves_mode(
     assert created.status_code == 202
     body = created.json()
     assert body["search_mode"] == "deep"
-    assert body["catalog"]["profile"] == "quick"
-    assert body["coverage"]["selected"] == 20
+    assert body["catalog"]["profile"] == "deep"
+    assert body["coverage"]["selected"] == 56
     assert body["deep_progress"] == {
         "current_phase": "queued",
         "phase_started_at": body["accepted_at"],
@@ -497,7 +497,35 @@ def test_deep_footprint_job_reuses_quick_catalog_and_preserves_mode(
         job = session.get(SearchJob, body["job_id"])
         assert job is not None
         assert job.search_mode == "deep"
-        assert job.catalog_profile == "quick"
+        assert job.catalog_profile == "deep"
+        runs = session.scalars(
+            select(ProviderRun)
+            .where(ProviderRun.job_id == job.id)
+            .order_by(ProviderRun.logical_run_id)
+        ).all()
+        scans = [session.get(MaigretScanRun, run.id) for run in runs]
+
+        assert len(runs) == 8
+        assert all(scan is not None for scan in scans)
+        assert [scan.selected_count for scan in scans if scan is not None] == [7] * 8
+        assert all(scan.scan_profile == "deep" for scan in scans if scan is not None)
+        selected_sites = [
+            site
+            for scan in scans
+            if scan is not None
+            for site in scan.site_names
+        ]
+        assert len(selected_sites) == len(set(selected_sites)) == 56
+        assert "Facebook" in selected_sites
+        assert "mastodon.social" in selected_sites
+        assert (
+            session.scalar(
+                select(func.count(OutboxMessage.id)).where(
+                    OutboxMessage.topic == "maigret_scan_run"
+                )
+            )
+            == 8
+        )
 
 
 def test_deep_progress_tracks_lifecycle_events_and_anchor_resolution(

@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-import pytest
 from sqlalchemy import func, select
 
 import apps.api.app.services.maigret_runs as maigret_runs_service
@@ -26,6 +25,7 @@ from apps.api.app.models.entities import (
     SourceObservation,
     new_id,
 )
+from apps.api.app.services.anchor_selection import eligible_anchor_candidate_ids
 from apps.api.app.services.professional_search_runs import (
     process_professional_search_run,
 )
@@ -167,7 +167,7 @@ def _add_exact_profile_check(
     display_name: str,
     ordinal: int,
     extra_data: dict[str, object] | None = None,
-) -> None:
+) -> str:
     routes = {
         "Instagram": "https://www.instagram.com/alice",
         "Threads": "https://www.threads.net/@alice",
@@ -242,6 +242,8 @@ def _add_exact_profile_check(
             created_at=now,
         )
     )
+    session.flush()
+    return node_id
 
 
 def _settings(**overrides):
@@ -321,7 +323,7 @@ def _disable_finalizer(monkeypatch) -> None:
 def test_scheduler_waits_for_all_roots_then_creates_one_adaptive_wave():
     now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
     factory = _session_factory()
-    job_id, attempt_id = _add_job(factory, now=now)
+    job_id, attempt_id = _add_job(factory, now=now, search_mode="deep")
     with factory() as session, session.begin():
         first_root = _add_provider_run(
             session,
@@ -451,11 +453,210 @@ def test_scheduler_waits_for_all_roots_then_creates_one_adaptive_wave():
         )
 
 
-@pytest.mark.parametrize("search_mode", ["quick", "deep"])
-def test_both_modes_build_the_same_anchor_aware_adaptive_plan(search_mode):
+def test_quick_mode_uses_exa_only_and_caps_the_adaptive_envelope():
     now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
     factory = _session_factory()
-    job_id, attempt_id = _add_job(factory, now=now, search_mode=search_mode)
+    job_id, attempt_id = _add_job(factory, now=now, search_mode="quick")
+    with factory() as session, session.begin():
+        root_id = _add_provider_run(
+            session,
+            job_id=job_id,
+            attempt_id=attempt_id,
+            now=now,
+            provider_id="maigret_discovery_v1",
+            status="success",
+            logical_run_id="maigret:root:000",
+        )
+        node_ids = [
+            _add_exact_profile_check(
+                session,
+                job_id=job_id,
+                provider_run_id=root_id,
+                now=now,
+                platform=platform,
+                display_name=display_name,
+                ordinal=index,
+                extra_data={"bio": "Data Engineer@TikTok, MCS@UIUC"},
+            )
+            for index, (platform, display_name) in enumerate(
+                (
+                    ("Instagram", "Alice Example"),
+                    ("Threads", "Beatrice Example"),
+                    ("GitHub", "Carla Example"),
+                    ("Pinterest", "Diana Example"),
+                ),
+                start=1,
+            )
+        ]
+        job = session.get(SearchJob, job_id)
+        assert job is not None
+        assert eligible_anchor_candidate_ids(
+            session,
+            job=job,
+            settings=_settings(exa_api_key="configured"),
+            now=now,
+        ) == frozenset(node_ids[:2])
+        assert schedule_professional_search_if_ready(
+            session,
+            job=job,
+            now=now,
+            settings=_settings(exa_api_key="configured"),
+        )
+
+    with factory() as session:
+        runs = session.scalars(
+            select(ProviderRun)
+            .where(
+                ProviderRun.job_id == job_id,
+                ProviderRun.provider_id.in_(PROFESSIONAL_PROVIDER_IDS),
+            )
+            .order_by(ProviderRun.provider_id)
+        ).all()
+        assert len(runs) == 2
+        assert {run.provider_id for run in runs} == {EXA_PEOPLE_PROVIDER_ID}
+        job = session.get(SearchJob, job_id)
+        assert job is not None and job.search_mode == "quick"
+        assert all(run.query_config["retrieval_mode"] == "adaptive" for run in runs)
+        assert sum(int(run.query_config["query_budget"]) for run in runs) == 6
+        assert sum(int(run.query_config["request_budget"]) for run in runs) == 6
+        assert sum(int(run.query_config["result_budget"]) for run in runs) == 10
+        assert all(run.query_config["stagnation_query_limit"] == 2 for run in runs)
+        assert all(
+            run.deadline_at.replace(tzinfo=UTC) == now + timedelta(seconds=40) for run in runs
+        )
+
+
+def test_quick_mode_settings_can_lower_every_effective_cap():
+    policy = professional_scheduling_service.effective_adaptive_professional_search_policy(
+        settings=_settings(
+            adaptive_professional_search_max_names=1,
+            adaptive_professional_search_max_queries=4,
+            adaptive_professional_search_max_requests=3,
+            adaptive_professional_search_max_profiles=7,
+            adaptive_professional_search_budget_seconds=35,
+            adaptive_professional_search_stagnation_queries=1,
+        ),
+        search_mode="quick",
+    )
+
+    assert policy == professional_scheduling_service.AdaptiveProfessionalSearchPolicy(
+        maximum_names=1,
+        max_queries=4,
+        max_requests=3,
+        max_profiles=7,
+        budget_seconds=35,
+        stagnation_queries=1,
+        github_allowed=False,
+    )
+
+
+def test_anchor_eligibility_keeps_two_choices_when_search_cap_is_one():
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _session_factory()
+    job_id, attempt_id = _add_job(factory, now=now, search_mode="quick")
+    with factory() as session, session.begin():
+        root_id = _add_provider_run(
+            session,
+            job_id=job_id,
+            attempt_id=attempt_id,
+            now=now,
+            provider_id="maigret_discovery_v1",
+            status="success",
+            logical_run_id="maigret:root:000",
+        )
+        node_ids = {
+            _add_exact_profile_check(
+                session,
+                job_id=job_id,
+                provider_run_id=root_id,
+                now=now,
+                platform=platform,
+                display_name=display_name,
+                ordinal=index,
+                extra_data={"bio": "Public profile"},
+            )
+            for index, (platform, display_name) in enumerate(
+                (
+                    ("Instagram", "Alice Example"),
+                    ("Threads", "Beatrice Example"),
+                ),
+                start=1,
+            )
+        }
+        job = session.get(SearchJob, job_id)
+        assert job is not None
+
+        eligible = eligible_anchor_candidate_ids(
+            session,
+            job=job,
+            settings=_settings(adaptive_professional_search_max_names=1),
+            now=now,
+        )
+
+    assert eligible == frozenset(node_ids)
+
+
+def test_quick_without_exa_key_neither_falls_back_to_github_nor_waits_for_anchor():
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _session_factory()
+    job_id, attempt_id = _add_job(factory, now=now, search_mode="quick")
+    with factory() as session, session.begin():
+        root_id = _add_provider_run(
+            session,
+            job_id=job_id,
+            attempt_id=attempt_id,
+            now=now,
+            provider_id="maigret_discovery_v1",
+            status="success",
+            logical_run_id="maigret:root:000",
+        )
+        for index, (platform, display_name) in enumerate(
+            (
+                ("Instagram", "Alice Example"),
+                ("Threads", "Beatrice Example"),
+            ),
+            start=1,
+        ):
+            _add_exact_profile_check(
+                session,
+                job_id=job_id,
+                provider_run_id=root_id,
+                now=now,
+                platform=platform,
+                display_name=display_name,
+                ordinal=index,
+                extra_data={"bio": "Public profile"},
+            )
+        job = session.get(SearchJob, job_id)
+        assert job is not None
+        job.seed_kind = "bare_handle"
+
+        assert not schedule_professional_search_if_ready(
+            session,
+            job=job,
+            now=now,
+            settings=_settings(
+                exa_api_key=None,
+                github_people_search_enabled=True,
+                github_provider_enabled=True,
+            ),
+        )
+        assert job.exploration_status == "running"
+        assert (
+            session.scalar(
+                select(func.count(ProviderRun.id)).where(
+                    ProviderRun.job_id == job_id,
+                    ProviderRun.provider_id.in_(PROFESSIONAL_PROVIDER_IDS),
+                )
+            )
+            == 0
+        )
+
+
+def test_deep_mode_keeps_the_full_configured_anchor_aware_adaptive_plan():
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _session_factory()
+    job_id, attempt_id = _add_job(factory, now=now, search_mode="deep")
     with factory() as session, session.begin():
         root_id = _add_provider_run(
             session,
@@ -474,9 +675,7 @@ def test_both_modes_build_the_same_anchor_aware_adaptive_plan(search_mode):
             platform="Instagram",
             display_name="Alice Example",
             ordinal=1,
-            extra_data={
-                "bio": "Data Engineer@TikTok, MCS@UIUC",
-            },
+            extra_data={"bio": "Data Engineer@TikTok, MCS@UIUC"},
         )
         job = session.get(SearchJob, job_id)
         assert job is not None
@@ -506,8 +705,6 @@ def test_both_modes_build_the_same_anchor_aware_adaptive_plan(search_mode):
         assert len(runs) == 2
         exa = next(run for run in runs if run.provider_id == EXA_PEOPLE_PROVIDER_ID)
         github = next(run for run in runs if run.provider_id == GITHUB_PROFESSIONAL_PROVIDER_ID)
-        job = session.get(SearchJob, job_id)
-        assert job is not None and job.search_mode == search_mode
         assert exa.query_config["queries"] == [
             "Alice Example San Francisco Bay Area",
             "Alice Example",
@@ -522,6 +719,7 @@ def test_both_modes_build_the_same_anchor_aware_adaptive_plan(search_mode):
         assert sum(int(run.query_config["query_budget"]) for run in runs) == 6
         assert sum(int(run.query_config["request_budget"]) for run in runs) == 9
         assert sum(int(run.query_config["result_budget"]) for run in runs) == 8
+        assert all(run.query_config["stagnation_query_limit"] == 3 for run in runs)
         assert all(
             run.deadline_at.replace(tzinfo=UTC) == now + timedelta(seconds=90) for run in runs
         )

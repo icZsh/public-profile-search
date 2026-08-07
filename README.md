@@ -8,11 +8,12 @@ The Maigret-backed discovery flow supports:
 
 - a handle with an optional source platform;
 - two explicit modes:
-  - **Quick** runs the reproducible 20-site catalog and adaptively expands
-    professional queries from public name, handle, location, employer, and education
-    signals under aggregate query, request, unique-profile, and time budgets;
-  - **Deep** uses the same adaptive retrieval, then adds the richer source-grounded
-    narrative pass;
+  - **Quick** runs the reproducible 20-site catalog, then gives Exa-only professional
+    retrieval a focused envelope of at most two name hypotheses, six queries/requests,
+    ten unique profiles, and 40 seconds;
+  - **Deep** runs a reproducible 56-site catalog across eight shards and the full
+    configured Exa + GitHub adaptive-retrieval envelope, then adds the richer
+    source-grounded narrative pass;
 - progressive candidate results while the remaining shards are still running;
 - distinct found, not-found, unknown, and inapplicable outcomes;
 - extracted public usernames and links with their discovery lineage; and
@@ -67,9 +68,10 @@ make web
 Open `http://localhost:3417` and enter a public handle or supported public profile URL.
 The browser polls the owner-scoped job and candidate endpoints while
 the Maigret worker checks each shard, then renders the frozen evidence-linked brief.
-After the root shards finish, the professional worker processes the shared adaptive
-second wave. Exa is optional: set the server-only `EXA_API_KEY` to enable indexed
-LinkedIn people results. The GitHub public-profile path works without it.
+After the root shards finish, the professional worker processes the mode-specific
+adaptive second wave. Exa is optional: set the server-only `EXA_API_KEY` to enable indexed
+LinkedIn people results. Quick intentionally skips professional retrieval when Exa is
+unavailable; Deep can still use the GitHub public-profile path without it.
 
 Deep story composition is gateway-configurable. The checked-in example selects
 `GROUNDED_SYNTHESIS_PROVIDER=openrouter`; add a server-only `OPENROUTER_API_KEY` and
@@ -100,7 +102,8 @@ scan starts.
 - `PROTOTYPE_JOBS_ENABLED=false` rejects all new jobs.
 - `MAIGRET_ENABLED=false` stops new Maigret jobs and prevents queued scans from running.
 - `MAIGRET_RUN_LEASE_SECONDS` controls the worker lease.
-- `MAIGRET_MAX_SHARDS_PER_JOB` caps the number of catalog shards a request can create.
+- `MAIGRET_MAX_SHARDS_PER_JOB` caps the number of catalog shards a request can create;
+  the promoted Quick and Deep profiles require three and eight shards, respectively.
 - `PROFESSIONAL_SEARCH_ENABLED=false` disables the second wave.
 - `PROFESSIONAL_SEARCH_MAX_RESULTS_PER_QUERY` and
   `PROFESSIONAL_SEARCH_MAX_GITHUB_PROFILES` are hard-capped at 5 and 3.
@@ -108,9 +111,10 @@ scan starts.
   `ADAPTIVE_PROFESSIONAL_SEARCH_MAX_QUERIES`,
   `ADAPTIVE_PROFESSIONAL_SEARCH_MAX_REQUESTS`,
   `ADAPTIVE_PROFESSIONAL_SEARCH_MAX_PROFILES`, and
-  `ADAPTIVE_PROFESSIONAL_SEARCH_BUDGET_SECONDS` define the shared aggregate
-  retrieval envelope. Expired adaptive leases terminate instead of replaying a
-  possibly consumed request envelope.
+  `ADAPTIVE_PROFESSIONAL_SEARCH_BUDGET_SECONDS` define Deep's aggregate retrieval
+  envelope and upper-bound Quick. Quick also applies product caps of 2 names, 6
+  queries/requests, 10 profiles, and 40 seconds and uses Exa only. Expired adaptive
+  leases terminate instead of replaying a possibly consumed request envelope.
 - `EXA_PEOPLE_SEARCH_ENABLED` and `GITHUB_PEOPLE_SEARCH_ENABLED` are independent
   provider kill switches; `EXA_API_KEY` and `GITHUB_API_TOKEN` remain server-only.
 - `GROUNDED_SYNTHESIS_ENABLED=false` disables the optional LLM pass.

@@ -6,8 +6,8 @@ aliases:
 status: proposed
 owner: Isaac
 created: 2026-07-22
-updated: 2026-07-30
-version: "3.4"
+updated: 2026-08-06
+version: "3.5"
 tags:
   - project
   - identity-resolution
@@ -18,7 +18,7 @@ tags:
 
 # Digital Footprint Finder — Project Plan
 
-> **v3.4 adaptive retrieval + multi-gateway Deep story plan:** Given a user ID, use Maigret as the primary
+> **v3.5 mode-specific retrieval + multi-gateway Deep story plan:** Given a user ID, use Maigret as the primary
 > cross-platform account-discovery engine, explain which discovered accounts may
 > represent the same person, adaptively retrieve professional context, and build either
 > a concise evidence report or a source-grounded LLM story.
@@ -132,19 +132,23 @@ default report.
 
 ### 1.4 Quick and Deep modes
 
-Quick and Deep share the same adaptive evidence foundation:
+Quick and Deep share the same evidence, identity, and orchestration rules, but spend
+different retrieval budgets:
 
-- the reviewed Maigret catalog scan;
-- adaptive professional queries derived from public name, handle, broad location,
-  employer, education, and project signals; and
-- one job-level query, request, unique-profile, and time envelope.
+- Quick scans the promoted 20-site catalog and caps Exa-only professional retrieval at
+  two public-name hypotheses, six queries/requests, ten unique profiles, and 40 seconds.
+- Deep scans the promoted 56-site catalog in eight shards and uses the full configured
+  Exa + GitHub adaptive envelope (four names, 20 queries, 32 requests, 30 profiles, and
+  120 seconds by default).
+- Both derive professional queries from public name, handle, broad location, employer,
+  education, and project signals and preserve the same evidence lineage.
 
-The modes differ at composition time:
+Deep also differs at composition time:
 
 | Mode | Retrieval | Deliverable |
 |---|---|---|
-| `quick` | Shared adaptive evidence workflow | Concise deterministic brief with accounts, qualified facts, evidence, and limitations |
-| `deep` | The same shared adaptive workflow | A source-grounded LLM story with a calibrated conclusion, identity snapshot, account narrative, curated findings, exclusions, coverage, evidence index, and reassessment conditions |
+| `quick` | Focused 20-site + capped Exa workflow | Concise deterministic brief with accounts, qualified facts, evidence, and limitations |
+| `deep` | Expanded 56-site + full Exa/GitHub workflow | A source-grounded LLM story with a calibrated conclusion, identity snapshot, account narrative, curated findings, exclusions, coverage, evidence index, and reassessment conditions |
 
 The LLM may select, connect, and narrate only the collected evidence. The host remains
 authoritative for account existence, person-association status, confidence ceilings,
@@ -1184,12 +1188,13 @@ or traversal concerns that this application's revisioned evidence graph must own
 - candidate-to-seed comparison.
 
 The first implemented Wave 2 slice is a bounded professional-search provider. It starts
-only after all root Maigret shards are terminal, derives no more than two plausible
-public full-name hypotheses from exact first-party root profiles, and schedules:
+only after all root Maigret shards are terminal, derives mode-bounded plausible public
+full-name hypotheses from exact first-party root profiles (two in Quick and four by
+default in Deep), and schedules:
 
 - Exa people search with at most five indexed LinkedIn `/in/` results per hypothesis;
-- GitHub user search/direct profile lookup with at most three fetched profiles per
-  hypothesis; and
+- in Deep, GitHub user search/direct profile lookup with at most three fetched profiles
+  per hypothesis; and
 - no recursive professional-to-professional fan-out.
 
 Every result is persisted as a source document, observation, account node, and

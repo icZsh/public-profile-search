@@ -1702,9 +1702,9 @@ components:
           enum: [quick, deep]
           default: quick
           description: >-
-            Both modes run the same adaptive account and professional discovery
-            workflow. Quick returns a concise deterministic brief; Deep adds a
-            source-grounded LLM story.
+            Quick runs a focused account catalog and capped Exa-only professional
+            search. Deep runs a broader catalog and the full configured Exa and
+            GitHub search envelope before adding a source-grounded LLM story.
         locale:
           type: string
           enum: [en-US, zh-CN]

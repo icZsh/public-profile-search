@@ -19,16 +19,16 @@ const searchModeOptions: {
   {
     value: "quick",
     label: "Quick",
-    eyebrow: "Adaptive evidence search",
+    eyebrow: "Focused retrieval",
     description:
-      "Cross-platform and professional discovery with a concise evidence brief.",
+      "A focused 20-site account scan and short people search with a concise evidence brief.",
   },
   {
     value: "deep",
     label: "Deep",
-    eyebrow: "LLM-authored story",
+    eyebrow: "Expanded retrieval + story",
     description:
-      "The same adaptive discovery, followed by a source-grounded long-form footprint story.",
+      "A broader 56-site scan and full professional search, followed by a source-grounded story.",
   },
 ];
 
@@ -118,7 +118,7 @@ export function FootprintSearchForm() {
       </div>
 
       <fieldset className="searchModePicker" disabled={busy}>
-        <legend>Report mode</legend>
+        <legend>Search depth</legend>
         <div className="searchModeOptions">
           {searchModeOptions.map((option) => (
             <label
@@ -157,7 +157,7 @@ export function FootprintSearchForm() {
             type="text"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
-            placeholder="@octaviyao or https://instagram.com/octaviyao"
+            placeholder="Handle or public profile URL"
             autoCapitalize="none"
             autoComplete="off"
             spellCheck={false}
@@ -185,8 +185,8 @@ export function FootprintSearchForm() {
         </span>
         <span>
           {searchMode === "deep"
-            ? "Adaptive discovery, then grounded LLM composition"
-            : "Candidate links appear while bounded queries expand"}
+            ? "56-site scan, full retrieval, then grounded LLM composition"
+            : "20-site scan with up to 40 seconds for people search"}
         </span>
         <span>No account match is assumed to be the same person</span>
       </div>

@@ -121,6 +121,12 @@ _ADAPTIVE_MAX_STAGNATION_QUERIES = 6
 _ADAPTIVE_EXA_PROFILES_PER_REQUEST = 5
 _ADAPTIVE_EXA_PROFILES_PER_RUN = 15
 _ADAPTIVE_GITHUB_PROFILES_PER_RUN = 3
+_QUICK_ADAPTIVE_MAX_NAMES = 2
+_QUICK_ADAPTIVE_MAX_QUERIES = 6
+_QUICK_ADAPTIVE_MAX_REQUESTS = 6
+_QUICK_ADAPTIVE_MAX_PROFILES = 10
+_QUICK_ADAPTIVE_MAX_BUDGET_SECONDS = 40
+_QUICK_ADAPTIVE_MAX_STAGNATION_QUERIES = 2
 
 
 @dataclass(frozen=True)
@@ -143,6 +149,17 @@ class AdaptiveProfessionalRunPlan:
     candidate_logins: tuple[str, ...]
     request_budget: int
     result_budget: int
+
+
+@dataclass(frozen=True)
+class AdaptiveProfessionalSearchPolicy:
+    maximum_names: int
+    max_queries: int
+    max_requests: int
+    max_profiles: int
+    budget_seconds: int
+    stagnation_queries: int
+    github_allowed: bool
 
 
 @dataclass
@@ -187,12 +204,11 @@ def schedule_professional_search_if_ready(
     if not maigret_runs or any(run.status not in _MAIGRET_TERMINAL_STATES for run in maigret_runs):
         return False
 
-    maximum_names = _bounded_int(
-        getattr(settings, "adaptive_professional_search_max_names", 4),
-        default=4,
-        minimum=1,
-        maximum=_ADAPTIVE_MAX_NAMES,
+    policy = effective_adaptive_professional_search_policy(
+        settings=settings,
+        search_mode=job.search_mode,
     )
+    maximum_names = policy.maximum_names
     hypotheses = derive_professional_name_hypotheses(
         session,
         job=job,
@@ -203,8 +219,10 @@ def schedule_professional_search_if_ready(
         return False
 
     exa_enabled = bool(getattr(settings, "exa_people_search_enabled", True))
-    github_enabled = bool(getattr(settings, "github_people_search_enabled", True)) and bool(
-        getattr(settings, "github_provider_enabled", True)
+    github_enabled = (
+        policy.github_allowed
+        and bool(getattr(settings, "github_people_search_enabled", True))
+        and bool(getattr(settings, "github_provider_enabled", True))
     )
     adaptive_exa_available = exa_enabled and _secret_present(getattr(settings, "exa_api_key", None))
     anchor = selected_anchor(session, job=job)
@@ -243,12 +261,7 @@ def schedule_professional_search_if_ready(
         minimum=1,
         maximum=3,
     )
-    budget_seconds = _bounded_int(
-        getattr(settings, "adaptive_professional_search_budget_seconds", 120),
-        default=120,
-        minimum=30,
-        maximum=_ADAPTIVE_MAX_BUDGET_SECONDS,
-    )
+    budget_seconds = policy.budget_seconds
     wave_deadline = _earlier_datetime(
         job.deadline_at,
         now + timedelta(seconds=budget_seconds),
@@ -259,24 +272,9 @@ def schedule_professional_search_if_ready(
         root_handle=job.seed_identifier or "",
         exa_enabled=adaptive_exa_available,
         github_enabled=github_enabled,
-        max_queries=_bounded_int(
-            getattr(settings, "adaptive_professional_search_max_queries", 20),
-            default=20,
-            minimum=1,
-            maximum=_ADAPTIVE_MAX_QUERIES,
-        ),
-        max_requests=_bounded_int(
-            getattr(settings, "adaptive_professional_search_max_requests", 32),
-            default=32,
-            minimum=1,
-            maximum=_ADAPTIVE_MAX_REQUESTS,
-        ),
-        max_profiles=_bounded_int(
-            getattr(settings, "adaptive_professional_search_max_profiles", 30),
-            default=30,
-            minimum=1,
-            maximum=_ADAPTIVE_MAX_PROFILES,
-        ),
+        max_queries=policy.max_queries,
+        max_requests=policy.max_requests,
+        max_profiles=policy.max_profiles,
     )
     adaptive_plans_by_hypothesis: dict[int, list[AdaptiveProfessionalRunPlan]] = defaultdict(list)
     for plan in adaptive_plans:
@@ -309,16 +307,7 @@ def schedule_professional_search_if_ready(
                 "request_budget": plan.request_budget,
                 "result_budget": plan.result_budget,
                 "time_budget_seconds": budget_seconds,
-                "stagnation_query_limit": _bounded_int(
-                    getattr(
-                        settings,
-                        "adaptive_professional_search_stagnation_queries",
-                        3,
-                    ),
-                    default=3,
-                    minimum=1,
-                    maximum=_ADAPTIVE_MAX_STAGNATION_QUERIES,
-                ),
+                "stagnation_query_limit": policy.stagnation_queries,
                 "company_anchors": list(hypothesis.company_anchors),
                 "education_anchors": list(hypothesis.education_anchors),
             }
@@ -374,6 +363,71 @@ def schedule_professional_search_if_ready(
         created_at=now,
     )
     return True
+
+
+def effective_adaptive_professional_search_policy(
+    *,
+    settings: object | None,
+    search_mode: str | None,
+) -> AdaptiveProfessionalSearchPolicy:
+    """Resolve the configured adaptive envelope against product-mode ceilings."""
+
+    configured = AdaptiveProfessionalSearchPolicy(
+        maximum_names=_bounded_int(
+            getattr(settings, "adaptive_professional_search_max_names", 4),
+            default=4,
+            minimum=1,
+            maximum=_ADAPTIVE_MAX_NAMES,
+        ),
+        max_queries=_bounded_int(
+            getattr(settings, "adaptive_professional_search_max_queries", 20),
+            default=20,
+            minimum=1,
+            maximum=_ADAPTIVE_MAX_QUERIES,
+        ),
+        max_requests=_bounded_int(
+            getattr(settings, "adaptive_professional_search_max_requests", 32),
+            default=32,
+            minimum=1,
+            maximum=_ADAPTIVE_MAX_REQUESTS,
+        ),
+        max_profiles=_bounded_int(
+            getattr(settings, "adaptive_professional_search_max_profiles", 30),
+            default=30,
+            minimum=1,
+            maximum=_ADAPTIVE_MAX_PROFILES,
+        ),
+        budget_seconds=_bounded_int(
+            getattr(settings, "adaptive_professional_search_budget_seconds", 120),
+            default=120,
+            minimum=30,
+            maximum=_ADAPTIVE_MAX_BUDGET_SECONDS,
+        ),
+        stagnation_queries=_bounded_int(
+            getattr(settings, "adaptive_professional_search_stagnation_queries", 3),
+            default=3,
+            minimum=1,
+            maximum=_ADAPTIVE_MAX_STAGNATION_QUERIES,
+        ),
+        github_allowed=True,
+    )
+    if str(search_mode or "quick").casefold() == "deep":
+        return configured
+    return AdaptiveProfessionalSearchPolicy(
+        maximum_names=min(configured.maximum_names, _QUICK_ADAPTIVE_MAX_NAMES),
+        max_queries=min(configured.max_queries, _QUICK_ADAPTIVE_MAX_QUERIES),
+        max_requests=min(configured.max_requests, _QUICK_ADAPTIVE_MAX_REQUESTS),
+        max_profiles=min(configured.max_profiles, _QUICK_ADAPTIVE_MAX_PROFILES),
+        budget_seconds=min(
+            configured.budget_seconds,
+            _QUICK_ADAPTIVE_MAX_BUDGET_SECONDS,
+        ),
+        stagnation_queries=min(
+            configured.stagnation_queries,
+            _QUICK_ADAPTIVE_MAX_STAGNATION_QUERIES,
+        ),
+        github_allowed=False,
+    )
 
 
 def build_adaptive_professional_query_plan(

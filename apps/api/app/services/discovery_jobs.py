@@ -50,7 +50,7 @@ PLATFORM_ALIASES = {
 SUPPORTED_SEARCH_MODES = {"quick", "deep"}
 CATALOG_PROFILE_BY_SEARCH_MODE = {
     "quick": "quick",
-    "deep": "quick",
+    "deep": "deep",
 }
 _SUCCESSFUL_FOOTPRINT_JOB_STATUSES = {
     "ready",

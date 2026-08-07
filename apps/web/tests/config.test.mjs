@@ -41,6 +41,8 @@ test("the footprint form submits a discriminated seed and opens the discovery ro
   const searchForm = await readWebFile("components/FootprintSearchForm.tsx");
 
   assert.match(searchForm, /name="identifier"/);
+  assert.match(searchForm, /placeholder="Handle or public profile URL"/);
+  assert.doesNotMatch(searchForm, /octaviyao/i);
   assert.match(searchForm, /kind: "profile_url"/);
   assert.match(searchForm, /profile_url: normalizedIdentifier/);
   assert.match(searchForm, /kind: "bare_handle"/);
@@ -54,10 +56,9 @@ test("the footprint form submits a discriminated seed and opens the discovery ro
   assert.match(searchForm, /value: "quick"/);
   assert.match(searchForm, /value: "deep"/);
   assert.match(searchForm, /search_mode: searchMode/);
-  assert.match(searchForm, /Adaptive evidence search/i);
-  assert.match(searchForm, /source-grounded long-form footprint story/i);
-  assert.match(searchForm, /<legend>Report mode<\/legend>/);
-  assert.doesNotMatch(searchForm, /<legend>Search depth<\/legend>/);
+  assert.match(searchForm, /Focused retrieval/i);
+  assert.match(searchForm, /broader 56-site scan and full professional search/i);
+  assert.match(searchForm, /<legend>Search depth<\/legend>/);
   assert.match(searchForm, /createFootprintJob/);
   assert.match(searchForm, /creationAttempt/);
   assert.match(searchForm, /payloadSignature/);

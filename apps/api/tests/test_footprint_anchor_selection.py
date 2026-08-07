@@ -31,6 +31,12 @@ from workers.maintenance.deadline_watchdog import finalize_expired_jobs
 HANDLE = "octaviyao"
 
 
+def _enable_quick_professional_search(settings) -> None:
+    settings.professional_search_enabled = True
+    settings.exa_people_search_enabled = True
+    settings.exa_api_key = "configured"
+
+
 def _create_bare_job(client, auth_headers, *, key: str) -> str:
     response = client.post(
         "/v1/footprint-jobs",
@@ -271,8 +277,7 @@ def test_bare_handle_checkpoint_is_owner_scoped_and_resumes_from_selected_anchor
     clock,
     auth_headers,
 ):
-    settings.professional_search_enabled = True
-    settings.exa_people_search_enabled = False
+    _enable_quick_professional_search(settings)
     job_id = _create_bare_job(
         client,
         auth_headers,
@@ -423,8 +428,7 @@ def test_awaiting_anchor_falls_back_at_existing_job_cutoff(
     clock,
     auth_headers,
 ):
-    settings.professional_search_enabled = True
-    settings.exa_people_search_enabled = False
+    _enable_quick_professional_search(settings)
     job_id = _create_bare_job(
         client,
         auth_headers,
@@ -479,8 +483,7 @@ def test_anchor_selection_closes_before_the_reserved_retrieval_window(
     auth_headers,
     monkeypatch,
 ):
-    settings.professional_search_enabled = True
-    settings.exa_people_search_enabled = False
+    _enable_quick_professional_search(settings)
     job_id = _create_bare_job(
         client,
         auth_headers,
@@ -573,8 +576,7 @@ def test_polling_advances_an_expired_anchor_checkpoint_once(
     clock,
     auth_headers,
 ):
-    settings.professional_search_enabled = True
-    settings.exa_people_search_enabled = False
+    _enable_quick_professional_search(settings)
     job_id = _create_bare_job(
         client,
         auth_headers,
@@ -624,8 +626,7 @@ def test_watchdog_advances_anchor_checkpoint_at_reserved_search_window(
     clock,
     auth_headers,
 ):
-    settings.professional_search_enabled = True
-    settings.exa_people_search_enabled = False
+    _enable_quick_professional_search(settings)
     job_id = _create_bare_job(
         client,
         auth_headers,
@@ -712,8 +713,7 @@ def test_checkpoint_is_skipped_when_less_than_thirty_seconds_remain(
     clock,
     auth_headers,
 ):
-    settings.professional_search_enabled = True
-    settings.exa_people_search_enabled = False
+    _enable_quick_professional_search(settings)
     job_id = _create_bare_job(
         client,
         auth_headers,
