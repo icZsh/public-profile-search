@@ -760,11 +760,21 @@ def build_evidence_packet(
         identifier=_required_structural_text(seed.identifier, maximum=160),
     )
 
+    # Budget checks are incremental. A packet serializes as its empty-list
+    # skeleton plus, for each list, every element's own JSON and one comma
+    # between neighbours, so a running total matches re-serializing the whole
+    # candidate packet without paying for one serialization per element.
     accepted_sources: list[SynthesisEvidenceSource] = []
     seen_source_ids: set[str] = set()
     sources_truncated = False
     account_reserve = min(max_chars // 4, max_accounts * 480)
     source_budget = max(_MIN_PACKET_CHARS, max_chars - account_reserve)
+    source_skeleton = _skeleton_size(
+        seed=safe_seed,
+        sources_truncated=False,
+        accounts_truncated=False,
+    )
+    source_payload = 0
     for index, value in enumerate(sources):
         if index >= _MAX_INPUT_SCAN:
             sources_truncated = True
@@ -775,23 +785,28 @@ def build_evidence_packet(
         if len(accepted_sources) >= max_sources:
             sources_truncated = True
             break
-        candidate_sources = (*accepted_sources, source)
-        candidate = _packet(
-            seed=safe_seed,
-            sources=candidate_sources,
-            accounts=(),
-            sources_truncated=False,
-            accounts_truncated=False,
+        candidate_payload = (
+            source_payload + _serialized_size(source) + (1 if accepted_sources else 0)
         )
-        if _serialized_size(candidate) > source_budget:
+        if source_skeleton + candidate_payload > source_budget:
             sources_truncated = True
             break
         accepted_sources.append(source)
         seen_source_ids.add(source.source_id)
+        source_payload = candidate_payload
 
     accepted_accounts: list[SynthesisEvidenceAccount] = []
     seen_account_ids: set[str] = set()
     accounts_truncated = False
+    account_skeleton = (
+        _skeleton_size(
+            seed=safe_seed,
+            sources_truncated=sources_truncated,
+            accounts_truncated=False,
+        )
+        + source_payload
+    )
+    account_payload = 0
     for index, value in enumerate(accounts):
         if index >= _MAX_INPUT_SCAN:
             accounts_truncated = True
@@ -802,19 +817,15 @@ def build_evidence_packet(
         if len(accepted_accounts) >= max_accounts:
             accounts_truncated = True
             break
-        candidate_accounts = (*accepted_accounts, account)
-        candidate = _packet(
-            seed=safe_seed,
-            sources=tuple(accepted_sources),
-            accounts=candidate_accounts,
-            sources_truncated=sources_truncated,
-            accounts_truncated=False,
+        candidate_payload = (
+            account_payload + _serialized_size(account) + (1 if accepted_accounts else 0)
         )
-        if _serialized_size(candidate) > max_chars:
+        if account_skeleton + candidate_payload > max_chars:
             accounts_truncated = True
             break
         accepted_accounts.append(account)
         seen_account_ids.add(account.account_id)
+        account_payload = candidate_payload
 
     packet = _packet(
         seed=safe_seed,
@@ -1768,8 +1779,27 @@ def _packet(
     )
 
 
-def _serialized_size(packet: SynthesisEvidencePacket) -> int:
-    return len(packet.model_dump_json(exclude_none=False))
+def _serialized_size(model: BaseModel) -> int:
+    return len(model.model_dump_json(exclude_none=False))
+
+
+def _skeleton_size(
+    *,
+    seed: SynthesisEvidenceSeed,
+    sources_truncated: bool,
+    accounts_truncated: bool,
+) -> int:
+    """Serialized size of a packet carrying the seed and flags but no list items."""
+
+    return _serialized_size(
+        _packet(
+            seed=seed,
+            sources=(),
+            accounts=(),
+            sources_truncated=sources_truncated,
+            accounts_truncated=accounts_truncated,
+        )
+    )
 
 
 def _require_all_json_schema_properties(value: object) -> None:

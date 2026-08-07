@@ -455,6 +455,37 @@ def test_evidence_packet_character_budget_and_invalid_urls_are_enforced():
     assert "alice@example.test" not in query_stripped.model_dump_json()
 
 
+@pytest.mark.parametrize("max_chars", [2_000, 2_500, 4_000, 9_000, 20_000, 48_000])
+def test_evidence_packet_budget_is_tight_at_every_truncation_boundary(max_chars):
+    # The character budget is enforced with running totals rather than by
+    # re-serializing each candidate packet. Pin the observable contract: the
+    # packet fits its budget, and it is maximal -- one more source would not.
+    sources = [
+        _source(f"source-{index}", excerpt="profile evidence " * 30) for index in range(40)
+    ]
+    accounts = [_account((f"source-{index}",)) for index in range(30)]
+
+    packet = build_evidence_packet(
+        seed=_seed(),
+        sources=sources,
+        accounts=accounts,
+        max_chars=max_chars,
+    )
+
+    assert len(packet.model_dump_json(exclude_none=False)) <= max_chars
+    if packet.sources_truncated and len(packet.sources) < len(sources):
+        one_more = build_evidence_packet(
+            seed=_seed(),
+            sources=sources[: len(packet.sources) + 1],
+            accounts=(),
+            max_chars=100_000,
+        )
+        assert len(one_more.sources) == len(packet.sources) + 1
+        account_reserve = min(max_chars // 4, 30 * 480)
+        source_budget = max(2_000, max_chars - account_reserve)
+        assert len(one_more.model_dump_json(exclude_none=False)) > source_budget
+
+
 def test_output_schema_is_strict_and_requires_grounding_for_summary():
     schema = grounded_synthesis_json_schema()
 
