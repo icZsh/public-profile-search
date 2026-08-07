@@ -24,7 +24,19 @@
         "insufficient_evidence",
         "job_cancelled",
         "result_unavailable",
-        "job_deleted"
+        "job_deleted",
+        "job.accepted",
+        "discovery.catalog_scan_started",
+        "discovery.catalog_progress",
+        "discovery.anchor_required",
+        "discovery.anchor_selected",
+        "discovery.anchor_window_expired",
+        "discovery.professional_search_started",
+        "discovery.professional_search_progress",
+        "discovery.synthesis_started",
+        "discovery.synthesis_progress",
+        "candidate.discovered",
+        "job.ready"
       ]
     },
     "message": {
@@ -41,4 +53,3 @@
     }
   }
 }
-

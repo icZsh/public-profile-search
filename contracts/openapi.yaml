@@ -3,16 +3,17 @@ info:
   title: Public Profile Search Prototype API
   version: 0.2.0
   description: >-
-    Local-only contract for an eligibility-gated, deterministic Fast Brief.
-    The only live adapter is a GitHub direct-profile provider authorized by the
-    project owner for limited local evaluation. It is not approved for MVP,
-    shared use, bulk collection, or production deployment.
+    Local-only contract for Maigret-backed cross-platform candidate discovery
+    and the legacy eligibility-gated deterministic Fast Brief. Candidate
+    existence is discovery evidence, not proof that accounts belong to the
+    same person.
 servers:
   - url: http://localhost:8800
 tags:
   - name: Health
   - name: Eligibility
   - name: Jobs
+  - name: Footprint discovery
   - name: Local administration
 paths:
   /healthz:
@@ -358,6 +359,217 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EvidenceList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs:
+    post:
+      tags: [Footprint discovery]
+      operationId: createFootprintJob
+      description: >-
+        Starts a bounded Maigret-backed search for public account candidates
+        from a direct profile URL, platform handle, or bare handle. A claimed
+        account is returned as an unresolved candidate, not as a same-person
+        conclusion.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFootprintJobRequest"
+      responses:
+        "202":
+          description: Discovery job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintJob"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+      - $ref: "#/components/parameters/PrototypeUser"
+    get:
+      tags: [Footprint discovery]
+      operationId: getFootprintJob
+      security:
+        - prototypeAuth: []
+      responses:
+        "200":
+          description: Owner-visible discovery status and aggregate catalog coverage.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintJob"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Footprint discovery]
+      operationId: deleteFootprintJob
+      security:
+        - prototypeAuth: []
+      responses:
+        "204":
+          description: Discovery data removed and a resurrection tombstone written.
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/candidates:
+    get:
+      tags: [Footprint discovery]
+      operationId: listFootprintCandidates
+      description: >-
+        Returns candidates discovered so far, including while catalog shards
+        are still running. Relationships remain unresolved in this slice.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Current owner-visible candidate collection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/anchor:
+    post:
+      tags: [Footprint discovery]
+      operationId: selectFootprintAnchor
+      description: >-
+        Selects one exact-handle account as the known starting profile when a
+        bare-handle discovery pauses on competing public name hypotheses.
+        Repeating the same selection is idempotent.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelectFootprintAnchorRequest"
+      responses:
+        "200":
+          description: Anchor selected and discovery resumed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelectFootprintAnchorResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/brief:
+    get:
+      tags: [Footprint discovery]
+      operationId: getFootprintBrief
+      description: >-
+        Returns the current owner-visible account- or person-centric brief after
+        footprint finalization. This read is scoped to footprint ownership and
+        does not use the legacy self-audit eligibility gate.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Current evidence-linked footprint brief.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintBrief"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/evidence:
+    get:
+      tags: [Footprint discovery]
+      operationId: getFootprintEvidence
+      description: >-
+        Returns display-approved observations from the frozen snapshot behind
+        the current footprint brief.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Evidence referenced by the current footprint report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/events:
+    get:
+      tags: [Footprint discovery]
+      operationId: streamFootprintJobEvents
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+        - name: last_event_id
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: Last-Event-ID
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream of safe, replayable discovery JobEvent objects.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+            X-Robots-Tag:
+              schema:
+                type: string
+          content:
+            text/event-stream:
+              schema:
+                type: string
         "401":
           $ref: "#/components/responses/Error"
         "404":
@@ -708,12 +920,24 @@ components:
     EvidenceItem:
       type: object
       additionalProperties: false
-      required: [evidence_id, source_type, title, url, excerpt, retrieved_at]
+      required:
+        - evidence_id
+        - source_type
+        - trust_class
+        - publisher
+        - title
+        - url
+        - excerpt
+        - retrieved_at
       properties:
         evidence_id:
           type: string
           format: uuid
         source_type:
+          type: string
+        trust_class:
+          type: string
+        publisher:
           type: string
         title:
           type: string
@@ -734,6 +958,998 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EvidenceItem"
+    FootprintBriefAccount:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_id
+        - platform
+        - handle
+        - profile_url
+        - display_name
+        - existence_status
+        - identity_status
+        - confidence
+        - source_ids
+        - reasons
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+        handle:
+          type: string
+        profile_url:
+          type: string
+          format: uri
+        display_name:
+          type: [string, "null"]
+        existence_status:
+          type: string
+          enum:
+            - exact_verified
+            - indexed_profile
+            - claimed_unverified
+            - channel_limited
+            - excluded
+        identity_status:
+          type: string
+          enum: [confirmed, likely, unverified, conflicting, excluded]
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        reasons:
+          type: array
+          items:
+            type: string
+    FootprintBriefClaim:
+      type: object
+      additionalProperties: false
+      required:
+        - claim_id
+        - predicate
+        - label
+        - value
+        - confidence
+        - source_ids
+        - qualification
+      properties:
+        claim_id:
+          type: string
+          format: uuid
+        predicate:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        qualification:
+          type: [string, "null"]
+    FootprintIdentityReasons:
+      type: object
+      additionalProperties: false
+      required: [supporting, limiting]
+      properties:
+        supporting:
+          type: array
+          items:
+            type: string
+        limiting:
+          type: array
+          items:
+            type: string
+    FootprintCitedText:
+      type: object
+      additionalProperties: false
+      required: [text, source_ids]
+      properties:
+        text:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintNarrativeSection:
+      type: object
+      additionalProperties: false
+      required: [key, title, body, source_ids, highlights]
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        highlights:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintCitedText"
+    FootprintDeepIdentityFact:
+      type: object
+      additionalProperties: false
+      required: [label, value, confidence, status, qualification, source_ids]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        status:
+          type: string
+          enum:
+            - observed
+            - self_described
+            - indexed
+            - likely
+            - independently_unverified
+            - unknown
+        qualification:
+          type: [string, "null"]
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepAccountInsight:
+      type: object
+      additionalProperties: false
+      required:
+        - account_id
+        - rationale
+        - source_ids
+        - public_facts
+        - association_reasons
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        rationale:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        public_facts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintCitedText"
+        association_reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintCitedText"
+    FootprintDeepCuratedClaim:
+      type: object
+      additionalProperties: false
+      required:
+        - claim_id
+        - predicate
+        - label
+        - value
+        - confidence
+        - status
+        - source_ids
+        - contradicting_source_ids
+        - qualification
+        - supporting_evidence
+        - limiting_evidence
+      properties:
+        claim_id:
+          type: string
+        predicate:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        status:
+          type: string
+          enum:
+            - confirmed
+            - likely
+            - possible
+            - independently_unverified
+            - contradicted
+            - unknown
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        contradicting_source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        qualification:
+          type: [string, "null"]
+        supporting_evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintCitedText"
+        limiting_evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintCitedText"
+    FootprintDeepExcludedCandidate:
+      type: object
+      additionalProperties: false
+      required: [account_id, label, disposition, reason, source_ids]
+      properties:
+        account_id:
+          type: [string, "null"]
+          format: uuid
+        label:
+          type: string
+        disposition:
+          type: string
+          enum: [excluded, unverified, derivative, no_exact_hit, separate_cluster]
+        reason:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepChannelCoverage:
+      type: object
+      additionalProperties: false
+      required: [channel, status, detail, source_ids]
+      properties:
+        channel:
+          type: string
+        status:
+          type: string
+          enum:
+            - confirmed
+            - likely
+            - candidate
+            - unverified
+            - no_exact_hit
+            - channel_limited
+            - excluded
+            - not_checked
+        detail:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepProfileAnswer:
+      type: object
+      additionalProperties: false
+      required: [value, confidence, basis, explanation, source_ids]
+      properties:
+        value:
+          type: [string, "null"]
+        confidence:
+          oneOf:
+            - type: string
+              enum: [high, medium_high, medium, low]
+            - type: "null"
+        basis:
+          type: string
+          enum: [observed, self_described, indexed, inferred, mixed, unknown]
+        explanation:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepProfileTrait:
+      type: object
+      additionalProperties: false
+      required: [label, confidence, basis, explanation, source_ids]
+      properties:
+        label:
+          type: string
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        basis:
+          type: string
+          enum: [observed, self_described, indexed, inferred, mixed]
+        explanation:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepProfileUnknown:
+      type: object
+      additionalProperties: false
+      required: [topic, explanation, source_ids]
+      properties:
+        topic:
+          type: string
+          enum:
+            - identity
+            - location
+            - occupation
+            - education
+            - interests
+            - likes
+            - dislikes
+            - projects
+            - other
+        explanation:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepTimelineEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - entry_type
+        - title
+        - organization
+        - timeframe
+        - currentness
+        - confidence
+        - basis
+        - explanation
+        - source_ids
+      properties:
+        entry_type:
+          type: string
+          enum: [work, education]
+        title:
+          type: string
+        organization:
+          type: [string, "null"]
+        timeframe:
+          type: [string, "null"]
+        currentness:
+          type: string
+          enum: [current, recent, historical, unclear]
+        confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        basis:
+          type: string
+          enum: [observed, self_described, indexed, inferred, mixed]
+        explanation:
+          type: string
+        source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    FootprintDeepSubjectProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - identity
+        - location
+        - occupation
+        - education
+        - interests
+        - likes
+        - dislikes
+        - unknowns
+        - career_timeline
+      properties:
+        identity:
+          $ref: "#/components/schemas/FootprintDeepProfileAnswer"
+        location:
+          $ref: "#/components/schemas/FootprintDeepProfileAnswer"
+        occupation:
+          $ref: "#/components/schemas/FootprintDeepProfileAnswer"
+        education:
+          $ref: "#/components/schemas/FootprintDeepProfileAnswer"
+        interests:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepProfileTrait"
+        likes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepProfileTrait"
+        dislikes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepProfileTrait"
+        unknowns:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepProfileUnknown"
+        career_timeline:
+          type: array
+          maxItems: 12
+          items:
+            $ref: "#/components/schemas/FootprintDeepTimelineEntry"
+    FootprintDeepStory:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+        - overview
+        - overview_source_ids
+        - conclusion
+        - conclusion_source_ids
+        - overall_confidence
+        - likely_public_identity
+        - broad_location
+        - major_boundary
+        - identity_facts
+        - account_insights
+        - curated_claims
+        - excluded_candidates
+        - channel_coverage
+        - next_verification_steps
+      properties:
+        version:
+          type: string
+          enum: [deep-story-v2, deep-story-v3, deep-story-v4]
+        overview:
+          type: string
+        overview_source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        conclusion:
+          type: string
+        conclusion_source_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        overall_confidence:
+          type: string
+          enum: [high, medium_high, medium, low]
+        likely_public_identity:
+          type: [string, "null"]
+        broad_location:
+          type: [string, "null"]
+        major_boundary:
+          type: string
+        identity_facts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepIdentityFact"
+        account_insights:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepAccountInsight"
+        curated_claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepCuratedClaim"
+        excluded_candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepExcludedCandidate"
+        channel_coverage:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintDeepChannelCoverage"
+        next_verification_steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintCitedText"
+        subject_profile:
+          oneOf:
+            - $ref: "#/components/schemas/FootprintDeepSubjectProfile"
+            - type: "null"
+    FootprintSynthesis:
+      type: object
+      additionalProperties: false
+      required: [mode, status, model, prompt_version, fallback_reason]
+      properties:
+        mode:
+          type: string
+          enum: [deterministic, llm_grounded]
+        status:
+          type: string
+          enum: [complete, fallback]
+        provider:
+          type: [string, "null"]
+          enum: [openai, openrouter, null]
+        model:
+          type: [string, "null"]
+        prompt_version:
+          type: string
+        fallback_reason:
+          type: [string, "null"]
+    FootprintBrief:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - report_type
+        - subject
+        - summary
+        - overall_identity_status
+        - accounts
+        - claims
+        - identity_reasons
+        - limitations
+        - generated_at
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        report_type:
+          type: string
+          enum: [account_centric, person_centric]
+        subject:
+          type: string
+        summary:
+          type: string
+        overall_identity_status:
+          type: string
+          enum: [confirmed, likely, unverified]
+        accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintBriefAccount"
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintBriefClaim"
+        identity_reasons:
+          $ref: "#/components/schemas/FootprintIdentityReasons"
+        narrative_sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintNarrativeSection"
+        deep_story:
+          anyOf:
+            - $ref: "#/components/schemas/FootprintDeepStory"
+            - type: "null"
+        synthesis:
+          $ref: "#/components/schemas/FootprintSynthesis"
+        limitations:
+          type: array
+          items:
+            type: string
+        generated_at:
+          type: string
+          format: date-time
+    FootprintSeed:
+      oneOf:
+        - title: Platform identifier
+          type: object
+          additionalProperties: false
+          required: [kind, platform, identifier_type, identifier]
+          properties:
+            kind:
+              const: platform_identifier
+            platform:
+              type: string
+              enum:
+                - github
+                - instagram
+                - linkedin
+                - reddit
+                - tiktok
+                - twitter
+                - x
+                - youtube
+                - other
+            identifier_type:
+              const: handle
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 64
+              description: Account handle, optionally prefixed with @; not a URL.
+        - title: Bare handle
+          type: object
+          additionalProperties: false
+          required: [kind, identifier_type, identifier]
+          properties:
+            kind:
+              const: bare_handle
+            platform:
+              type: "null"
+            identifier_type:
+              const: handle
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 64
+              description: Account handle, optionally prefixed with @; not a URL.
+        - title: Profile URL
+          type: object
+          additionalProperties: false
+          required: [kind, profile_url]
+          properties:
+            kind:
+              const: profile_url
+            profile_url:
+              type: string
+              format: uri
+              minLength: 1
+              maxLength: 300
+              description: >-
+                Direct HTTPS public profile URL on a supported platform. The API
+                infers and returns the normalized platform and handle.
+            platform:
+              type: string
+              enum:
+                - github
+                - instagram
+                - linkedin
+                - reddit
+                - tiktok
+                - twitter
+                - x
+                - youtube
+                - other
+              description: Optional client assertion; responses include the inferred platform.
+            identifier_type:
+              const: handle
+              description: Optional client assertion; responses include handle.
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 64
+              description: Optional client assertion; responses include the inferred handle.
+    FootprintSeedResponse:
+      oneOf:
+        - title: Normalized platform identifier
+          type: object
+          additionalProperties: false
+          required: [kind, platform, identifier_type, identifier]
+          properties:
+            kind:
+              const: platform_identifier
+            platform:
+              type: string
+              enum:
+                - github
+                - instagram
+                - linkedin
+                - reddit
+                - tiktok
+                - twitter
+                - x
+                - youtube
+                - other
+            identifier_type:
+              const: handle
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 64
+        - title: Normalized bare handle
+          type: object
+          additionalProperties: false
+          required: [kind, platform, identifier_type, identifier]
+          properties:
+            kind:
+              const: bare_handle
+            platform:
+              type: "null"
+            identifier_type:
+              const: handle
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 64
+        - title: Normalized profile URL
+          type: object
+          additionalProperties: false
+          required: [kind, profile_url, platform, identifier_type, identifier]
+          properties:
+            kind:
+              const: profile_url
+            profile_url:
+              type: string
+              format: uri
+              minLength: 1
+              maxLength: 300
+            platform:
+              type: string
+              enum:
+                - github
+                - instagram
+                - linkedin
+                - reddit
+                - tiktok
+                - twitter
+                - x
+                - youtube
+                - other
+            identifier_type:
+              const: handle
+            identifier:
+              type: string
+              minLength: 1
+              maxLength: 64
+    CreateFootprintJobRequest:
+      type: object
+      additionalProperties: false
+      required: [seed]
+      properties:
+        seed:
+          $ref: "#/components/schemas/FootprintSeed"
+        search_mode:
+          type: string
+          enum: [quick, deep]
+          default: quick
+          description: >-
+            Both modes run the same adaptive account and professional discovery
+            workflow. Quick returns a concise deterministic brief; Deep adds a
+            source-grounded LLM story.
+        locale:
+          type: string
+          enum: [en-US, zh-CN]
+          default: en-US
+    FootprintCoverage:
+      type: object
+      additionalProperties: false
+      required: [selected, completed, claimed, available, unknown, illegal]
+      properties:
+        selected:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+        claimed:
+          type: integer
+          minimum: 0
+        available:
+          type: integer
+          minimum: 0
+        unknown:
+          type: integer
+          minimum: 0
+        illegal:
+          type: integer
+          minimum: 0
+    FootprintCatalog:
+      type: object
+      additionalProperties: false
+      required: [engine, package_version, database_checksum, profile]
+      properties:
+        engine:
+          const: maigret
+        package_version:
+          type: [string, "null"]
+        database_checksum:
+          type: [string, "null"]
+        profile:
+          type: [string, "null"]
+    FootprintDeepProgress:
+      type: object
+      additionalProperties: false
+      required: [current_phase, phase_started_at, finished_at]
+      properties:
+        current_phase:
+          type: string
+          enum:
+            - queued
+            - account_scan
+            - awaiting_anchor
+            - professional_enrichment
+            - report_generation
+            - finalizing
+            - complete
+        phase_started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: [string, "null"]
+          format: date-time
+    FootprintJob:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - exploration_status
+        - deep_progress
+        - seed
+        - search_mode
+        - coverage
+        - catalog
+        - events_url
+        - candidates_url
+        - accepted_at
+        - deadline_at
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+            - discovering
+            - ready
+            - ready_partial
+            - no_candidates
+            - failed
+            - cancelled
+        exploration_status:
+          type: string
+          enum: [idle, running, awaiting_anchor, completed, cancelled]
+        deep_progress:
+          anyOf:
+            - $ref: "#/components/schemas/FootprintDeepProgress"
+            - type: "null"
+        seed:
+          $ref: "#/components/schemas/FootprintSeedResponse"
+        search_mode:
+          type: [string, "null"]
+          enum: [quick, deep, null]
+        coverage:
+          $ref: "#/components/schemas/FootprintCoverage"
+        catalog:
+          $ref: "#/components/schemas/FootprintCatalog"
+        events_url:
+          type: string
+        candidates_url:
+          type: string
+        accepted_at:
+          type: string
+          format: date-time
+        deadline_at:
+          type: string
+          format: date-time
+    SelectFootprintAnchorRequest:
+      type: object
+      additionalProperties: false
+      required: [candidate_id]
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+    SelectedFootprintAnchor:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_id
+        - platform
+        - handle
+        - profile_url
+        - display_name
+        - selection_state
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+        handle:
+          type: string
+        profile_url:
+          type: string
+          format: uri
+        display_name:
+          type: [string, "null"]
+        selection_state:
+          const: included
+    SelectFootprintAnchorResponse:
+      type: object
+      additionalProperties: false
+      required: [job, selected_anchor]
+      properties:
+        job:
+          $ref: "#/components/schemas/FootprintJob"
+        selected_anchor:
+          $ref: "#/components/schemas/SelectedFootprintAnchor"
+    CandidateEvidence:
+      type: object
+      additionalProperties: false
+      required: [site_check_id, site_name, status, discovery_method, observed_at]
+      properties:
+        site_check_id:
+          type: string
+          format: uuid
+        site_name:
+          type: string
+        status:
+          type: string
+          enum: [CLAIMED, AVAILABLE, UNKNOWN, ILLEGAL]
+        discovery_method:
+          type: string
+          enum: [username_catalog_probe, similar_handle_result]
+        observed_at:
+          type: string
+          format: date-time
+    AccountCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_id
+        - platform
+        - handle
+        - profile_url
+        - display_name
+        - relationship
+        - identity_tier
+        - selection_state
+        - anchor_eligible
+        - is_similar
+        - profile_data
+        - discovered_at
+        - evidence
+      properties:
+        candidate_id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+        handle:
+          type: string
+        profile_url:
+          type: string
+          format: uri
+        display_name:
+          type: [string, "null"]
+        relationship:
+          const: unresolved
+        identity_tier:
+          type: string
+          enum: [possible, weak]
+        selection_state:
+          type: string
+          enum: [undecided, included, excluded]
+        anchor_eligible:
+          type: boolean
+          description: >-
+            True only while this exact account is an available starting-profile
+            choice for the current ambiguity checkpoint.
+        is_similar:
+          type: boolean
+        profile_data:
+          type: object
+          additionalProperties: true
+        discovered_at:
+          type: string
+          format: date-time
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/CandidateEvidence"
+    CandidateList:
+      type: object
+      additionalProperties: false
+      required: [items, extracted_identifier_count]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountCandidate"
+        extracted_identifier_count:
+          type: integer
+          minimum: 0
     SuppressionRequest:
       type: object
       additionalProperties: false

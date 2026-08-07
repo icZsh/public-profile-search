@@ -20,6 +20,7 @@ def settings(tmp_path) -> Settings:
         prototype_hmac_key="test-hmac-key-that-is-definitely-long-enough",
         prototype_api_token="test-token",
         prototype_admin_token="test-admin-token",
+        professional_search_enabled=False,
     )
 
 

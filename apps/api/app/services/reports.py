@@ -100,6 +100,8 @@ def get_evidence(
         {
             "evidence_id": observation.id,
             "source_type": observation.source_type,
+            "trust_class": observation.trust_class,
+            "publisher": document.publisher,
             "title": document.title,
             "url": document.canonical_url,
             "excerpt": observation.excerpt,

@@ -1,7 +1,7 @@
 [project]
 name = "public-profile-search"
 version = "0.2.0"
-description = "Local eligibility-gated prototype for an evidence-backed public profile brief."
+description = "Local Maigret-backed cross-platform profile discovery prototype."
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
@@ -10,6 +10,7 @@ dependencies = [
   "cryptography>=45,<47",
   "fastapi>=0.115,<1",
   "httpx>=0.28,<1",
+  "maigret==0.6.3",
   "psycopg[binary]>=3.2,<4",
   "pydantic-settings>=2.7,<3",
   "pyyaml>=6,<7",

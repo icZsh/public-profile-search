@@ -15,6 +15,20 @@ from workers.orchestrator.celery_app import celery_app
 class TaskPublisher(Protocol):
     def send_provider_run(self, provider_run_id: str, task_id: str) -> None: ...
 
+    def send_maigret_scan_run(self, provider_run_id: str, task_id: str) -> None: ...
+
+    def send_professional_search_run(
+        self,
+        provider_run_id: str,
+        task_id: str,
+    ) -> None: ...
+
+    def send_grounded_synthesis_run(
+        self,
+        provider_run_id: str,
+        task_id: str,
+    ) -> None: ...
+
 
 class CeleryPublisher:
     def send_provider_run(self, provider_run_id: str, task_id: str) -> None:
@@ -23,6 +37,38 @@ class CeleryPublisher:
             args=[provider_run_id],
             task_id=task_id,
             queue="fast_http",
+        )
+
+    def send_maigret_scan_run(self, provider_run_id: str, task_id: str) -> None:
+        celery_app.send_task(
+            "prototype.process_maigret_scan_run",
+            args=[provider_run_id],
+            task_id=task_id,
+            queue="maigret_scan",
+        )
+
+    def send_professional_search_run(
+        self,
+        provider_run_id: str,
+        task_id: str,
+    ) -> None:
+        celery_app.send_task(
+            "prototype.process_professional_search_run",
+            args=[provider_run_id],
+            task_id=task_id,
+            queue="professional_search",
+        )
+
+    def send_grounded_synthesis_run(
+        self,
+        provider_run_id: str,
+        task_id: str,
+    ) -> None:
+        celery_app.send_task(
+            "prototype.process_grounded_synthesis_run",
+            args=[provider_run_id],
+            task_id=task_id,
+            queue="grounded_synthesis",
         )
 
 
@@ -42,10 +88,27 @@ def dispatch_once(
             return False
         message.attempts += 1
         payload = message.payload
-        if message.topic != "provider_run" or "provider_run_id" not in payload:
+        provider_run_id = payload.get("provider_run_id")
+        if not provider_run_id:
             message.dispatched_at = datetime.now(UTC)
             return True
-        publisher.send_provider_run(str(payload["provider_run_id"]), message.dedupe_key)
+        if message.topic == "provider_run":
+            publisher.send_provider_run(str(provider_run_id), message.dedupe_key)
+        elif message.topic == "maigret_scan_run":
+            publisher.send_maigret_scan_run(str(provider_run_id), message.dedupe_key)
+        elif message.topic == "professional_search_run":
+            publisher.send_professional_search_run(
+                str(provider_run_id),
+                message.dedupe_key,
+            )
+        elif message.topic == "grounded_synthesis_run":
+            publisher.send_grounded_synthesis_run(
+                str(provider_run_id),
+                message.dedupe_key,
+            )
+        else:
+            message.dispatched_at = datetime.now(UTC)
+            return True
         message.dispatched_at = datetime.now(UTC)
         return True
 

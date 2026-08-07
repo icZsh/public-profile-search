@@ -65,6 +65,14 @@ def _assert_security_and_headers(openapi: dict[str, Any]) -> None:
         ("/v1/search-jobs/{job_id}/events", "get"),
         ("/v1/search-jobs/{job_id}/brief", "get"),
         ("/v1/search-jobs/{job_id}/evidence", "get"),
+        ("/v1/footprint-jobs", "post"),
+        ("/v1/footprint-jobs/{job_id}", "get"),
+        ("/v1/footprint-jobs/{job_id}", "delete"),
+        ("/v1/footprint-jobs/{job_id}/candidates", "get"),
+        ("/v1/footprint-jobs/{job_id}/anchor", "post"),
+        ("/v1/footprint-jobs/{job_id}/brief", "get"),
+        ("/v1/footprint-jobs/{job_id}/evidence", "get"),
+        ("/v1/footprint-jobs/{job_id}/events", "get"),
     }
     admin_operations = {
         ("/v1/prototype/eligibility-verifications/{verification_id}", "get"),
@@ -101,6 +109,13 @@ def _assert_error_registry(errors: dict[str, Any]) -> None:
         "unsupported_provider",
         "invalid_request",
         "idempotency_conflict",
+        "anchor_candidate_not_found",
+        "anchor_candidate_invalid",
+        "anchor_candidate_not_hypothesis",
+        "anchor_selection_not_required",
+        "anchor_selection_closed",
+        "anchor_selection_expired",
+        "anchor_selection_unavailable",
         "job_not_found",
         "job_not_ready",
         "result_unavailable",
@@ -130,6 +145,9 @@ def main() -> None:
     openapi = yaml.safe_load((ROOT / "contracts" / "openapi.yaml").read_text())
     events = json.loads((ROOT / "contracts" / "events.schema.json").read_text())
     errors = yaml.safe_load((ROOT / "contracts" / "error-codes.yaml").read_text())
+    generated_typescript = (
+        ROOT / "packages" / "generated-api-client" / "src" / "index.ts"
+    ).read_text()
 
     assert openapi["openapi"].startswith("3.1")
     assert openapi["info"]["version"] == "0.2.0"
@@ -141,14 +159,40 @@ def main() -> None:
         "/v1/prototype/eligibility-verifications/{verification_id}/decision",
         "/v1/search-jobs",
         "/v1/search-jobs/{job_id}/brief",
+        "/v1/footprint-jobs",
+        "/v1/footprint-jobs/{job_id}",
+        "/v1/footprint-jobs/{job_id}/candidates",
+        "/v1/footprint-jobs/{job_id}/anchor",
+        "/v1/footprint-jobs/{job_id}/brief",
+        "/v1/footprint-jobs/{job_id}/evidence",
+        "/v1/footprint-jobs/{job_id}/events",
         "/v1/prototype/suppressions",
     }
     assert required_paths <= set(openapi["paths"])
 
-    operation_ids = [
-        operation["operationId"] for _path, _method, operation in _operations(openapi)
-    ]
+    operation_ids = [operation["operationId"] for _path, _method, operation in _operations(openapi)]
     assert len(operation_ids) == len(set(operation_ids)), "operationId values must be unique"
+    actual_operations = {
+        (path, method): operation for path, method, operation in _operations(openapi)
+    }
+    expected_footprint_operations = {
+        ("/v1/footprint-jobs", "post"): "createFootprintJob",
+        ("/v1/footprint-jobs/{job_id}", "get"): "getFootprintJob",
+        ("/v1/footprint-jobs/{job_id}", "delete"): "deleteFootprintJob",
+        ("/v1/footprint-jobs/{job_id}/candidates", "get"): "listFootprintCandidates",
+        ("/v1/footprint-jobs/{job_id}/anchor", "post"): "selectFootprintAnchor",
+        ("/v1/footprint-jobs/{job_id}/brief", "get"): "getFootprintBrief",
+        ("/v1/footprint-jobs/{job_id}/evidence", "get"): "getFootprintEvidence",
+        ("/v1/footprint-jobs/{job_id}/events", "get"): "streamFootprintJobEvents",
+    }
+    assert {
+        key: actual_operations[key]["operationId"] for key in expected_footprint_operations
+    } == expected_footprint_operations
+    assert "Idempotency-Key" in _parameter_names(
+        openapi,
+        "/v1/footprint-jobs",
+        actual_operations[("/v1/footprint-jobs", "post")],
+    )
     for ref in _refs(openapi):
         _resolve_ref(openapi, ref)
 
@@ -195,15 +239,220 @@ def main() -> None:
     for variant in decision_variants:
         assert set(variant["required"]) == {"decision", "review_code", "reviewer_id"}
 
+    footprint_seed_variants = schemas["FootprintSeed"]["oneOf"]
+    assert {variant["properties"]["kind"]["const"] for variant in footprint_seed_variants} == {
+        "platform_identifier",
+        "bare_handle",
+        "profile_url",
+    }
+    platform_seed = next(
+        variant
+        for variant in footprint_seed_variants
+        if variant["properties"]["kind"]["const"] == "platform_identifier"
+    )
+    bare_seed = next(
+        variant
+        for variant in footprint_seed_variants
+        if variant["properties"]["kind"]["const"] == "bare_handle"
+    )
+    profile_url_seed = next(
+        variant
+        for variant in footprint_seed_variants
+        if variant["properties"]["kind"]["const"] == "profile_url"
+    )
+    assert "platform" in platform_seed["required"]
+    assert "platform" not in bare_seed["required"]
+    assert bare_seed["properties"]["platform"]["type"] == "null"
+    assert set(profile_url_seed["required"]) == {"kind", "profile_url"}
+    assert profile_url_seed["properties"]["profile_url"]["format"] == "uri"
+    assert "platform" not in profile_url_seed["required"]
+    assert "identifier" not in profile_url_seed["required"]
+    assert all(
+        variant["properties"]["identifier_type"]["const"] == "handle"
+        for variant in footprint_seed_variants
+    )
+    footprint_seed_response_variants = schemas["FootprintSeedResponse"]["oneOf"]
+    assert {
+        variant["properties"]["kind"]["const"]
+        for variant in footprint_seed_response_variants
+    } == {
+        "platform_identifier",
+        "bare_handle",
+        "profile_url",
+    }
+    normalized_profile_url_seed = next(
+        variant
+        for variant in footprint_seed_response_variants
+        if variant["properties"]["kind"]["const"] == "profile_url"
+    )
+    assert set(normalized_profile_url_seed["required"]) == {
+        "kind",
+        "profile_url",
+        "platform",
+        "identifier_type",
+        "identifier",
+    }
+    assert (
+        schemas["CreateFootprintJobRequest"]["properties"]["seed"]["$ref"]
+        == "#/components/schemas/FootprintSeed"
+    )
+    footprint_search_mode = schemas["CreateFootprintJobRequest"]["properties"]["search_mode"]
+    assert footprint_search_mode["enum"] == ["quick", "deep"]
+    assert footprint_search_mode["default"] == "quick"
+
+    footprint_job = schemas["FootprintJob"]
+    assert {
+        "exploration_status",
+        "deep_progress",
+        "seed",
+        "coverage",
+        "catalog",
+        "events_url",
+        "candidates_url",
+    } <= set(footprint_job["required"])
+    assert footprint_job["properties"]["status"]["enum"] == [
+        "queued",
+        "discovering",
+        "ready",
+        "ready_partial",
+        "no_candidates",
+        "failed",
+        "cancelled",
+    ]
+    assert footprint_job["properties"]["search_mode"]["enum"] == [
+        "quick",
+        "deep",
+        None,
+    ]
+    assert (
+        footprint_job["properties"]["seed"]["$ref"]
+        == "#/components/schemas/FootprintSeedResponse"
+    )
+    assert footprint_job["properties"]["exploration_status"]["enum"] == [
+        "idle",
+        "running",
+        "awaiting_anchor",
+        "completed",
+        "cancelled",
+    ]
+    assert footprint_job["properties"]["deep_progress"]["anyOf"] == [
+        {"$ref": "#/components/schemas/FootprintDeepProgress"},
+        {"type": "null"},
+    ]
+    deep_progress = schemas["FootprintDeepProgress"]
+    assert set(deep_progress["required"]) == {
+        "current_phase",
+        "phase_started_at",
+        "finished_at",
+    }
+    assert deep_progress["properties"]["current_phase"]["enum"] == [
+        "queued",
+        "account_scan",
+        "awaiting_anchor",
+        "professional_enrichment",
+        "report_generation",
+        "finalizing",
+        "complete",
+    ]
+    assert deep_progress["properties"]["phase_started_at"]["format"] == "date-time"
+    assert deep_progress["properties"]["finished_at"] == {
+        "type": ["string", "null"],
+        "format": "date-time",
+    }
+    assert "deep_progress: FootprintDeepProgress | null;" in generated_typescript
+    assert "finished_at: string | null;" in generated_typescript
+    for phase in deep_progress["properties"]["current_phase"]["enum"]:
+        assert f'| "{phase}"' in generated_typescript, phase
+    assert set(schemas["SelectFootprintAnchorRequest"]["required"]) == {
+        "candidate_id"
+    }
+    assert set(schemas["SelectFootprintAnchorResponse"]["required"]) == {
+        "job",
+        "selected_anchor",
+    }
+    assert schemas["FootprintCatalog"]["properties"]["engine"]["const"] == "maigret"
+    assert set(schemas["FootprintCoverage"]["required"]) == {
+        "selected",
+        "completed",
+        "claimed",
+        "available",
+        "unknown",
+        "illegal",
+    }
+    assert set(schemas["CandidateList"]["required"]) == {
+        "items",
+        "extracted_identifier_count",
+    }
+    assert schemas["AccountCandidate"]["properties"]["relationship"]["const"] == "unresolved"
+    assert "anchor_eligible" in schemas["AccountCandidate"]["required"]
+    footprint_brief = schemas["FootprintBrief"]
+    assert set(footprint_brief["required"]) == {
+        "job_id",
+        "report_type",
+        "subject",
+        "summary",
+        "overall_identity_status",
+        "accounts",
+        "claims",
+        "identity_reasons",
+        "limitations",
+        "generated_at",
+    }
+    assert footprint_brief["properties"]["report_type"]["enum"] == [
+        "account_centric",
+        "person_centric",
+    ]
+    assert footprint_brief["properties"]["overall_identity_status"]["enum"] == [
+        "confirmed",
+        "likely",
+        "unverified",
+    ]
+    footprint_account = schemas["FootprintBriefAccount"]
+    assert footprint_account["properties"]["existence_status"]["enum"] == [
+        "exact_verified",
+        "indexed_profile",
+        "claimed_unverified",
+        "channel_limited",
+        "excluded",
+    ]
+    assert footprint_account["properties"]["identity_status"]["enum"] == [
+        "confirmed",
+        "likely",
+        "unverified",
+        "conflicting",
+        "excluded",
+    ]
+    assert schemas["FootprintBriefClaim"]["properties"]["qualification"]["type"] == [
+        "string",
+        "null",
+    ]
+
     assert "job_queued" in events["properties"]["type"]["enum"]
     assert {
         "brief_ready",
         "insufficient_evidence",
         "result_unavailable",
         "job_cancelled",
+        "job.accepted",
+        "discovery.catalog_scan_started",
+        "discovery.catalog_progress",
+        "discovery.anchor_required",
+        "discovery.anchor_selected",
+        "discovery.anchor_window_expired",
+        "discovery.professional_search_started",
+        "discovery.professional_search_progress",
+        "discovery.synthesis_started",
+        "discovery.synthesis_progress",
+        "candidate.discovered",
+        "job.ready",
     } <= set(events["properties"]["type"]["enum"])
+    for event_type in events["properties"]["type"]["enum"]:
+        assert f'| "{event_type}"' in generated_typescript, event_type
     _assert_error_registry(errors)
-    print("Contracts are structurally valid, including eligibility and admin auth boundaries.")
+    print(
+        "Contracts are structurally valid, including footprint discovery, "
+        "eligibility, and admin auth boundaries."
+    )
 
 
 if __name__ == "__main__":

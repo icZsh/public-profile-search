@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "engine": "maigret",
+  "package_version": "0.6.3",
+  "upstream_revision": "88f291e0b081c6914be3c9627d9f75da6b344afe",
+  "database_sha256": "4eeed3b475a1ff4dce558bbca926d50adcb6b8e5372770f330e25baa4a252df0",
+  "catalog_site_count": 3187,
+  "profiles": {
+    "quick": {
+      "site_names": [
+        "GitHub",
+        "Instagram",
+        "LinkedIn",
+        "Reddit",
+        "TikTok",
+        "Twitter",
+        "YouTube",
+        "Codepen",
+        "DEV Community",
+        "GitLab",
+        "StackOverflow",
+        "Medium",
+        "ProductHunt",
+        "Pinterest",
+        "Steam",
+        "Twitch",
+        "Flickr",
+        "HackerNews",
+        "Threads",
+        "Clubhouse"
+      ],
+      "shard_size": 7,
+      "timeout_seconds": 8,
+      "max_connections": 6
+    }
+  },
+  "runtime_policy": {
+    "auto_update": false,
+    "include_disabled_sites": false,
+    "parse_profiles": true,
+    "enrich_profiles": false,
+    "internal_retries": 0,
+    "check_domains": false,
+    "cookies": false,
+    "proxy": false,
+    "tor": false,
+    "i2p": false,
+    "cloudflare_bypass": false
+  }
+}

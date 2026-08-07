@@ -5,14 +5,21 @@ import json
 import re
 import socket
 import time
+import unicodedata
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
+EXA_API_HOST = "api.exa.ai"
+EXA_API_PORT = 443
 GITHUB_API_HOST = "api.github.com"
 GITHUB_API_PORT = 443
+EXA_MAX_PEOPLE_RESULTS = 5
+EXA_HIGHLIGHT_MAX_CHARACTERS = 1_000
+GITHUB_MAX_USER_SEARCH_RESULTS = 3
 GITHUB_USERNAME_PATTERN = re.compile(
     r"\A[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\Z",
     re.ASCII,
@@ -110,7 +117,7 @@ def _secret_value(value: object) -> str:
 
 
 class SafeFetchGateway:
-    """Fetches one fixed, allowlisted GitHub public-profile API resource."""
+    """Fetches fixed, allowlisted professional-profile API resources."""
 
     def __init__(
         self,
@@ -136,29 +143,95 @@ class SafeFetchGateway:
         if self._settings is None:
             raise SafeFetchError("safe_fetch_not_configured")
         normalized_username = self._validate_username(username)
-        maximum_bytes = self._positive_setting("safe_fetch_max_bytes")
-        total_timeout = self._positive_setting("safe_fetch_total_timeout_seconds")
-        connect_timeout = self._positive_setting("safe_fetch_connect_timeout_seconds")
-        read_timeout = self._positive_setting("safe_fetch_read_timeout_seconds")
-        started_at = self._monotonic()
-
-        try:
-            resolved_addresses = tuple(
-                dict.fromkeys(
-                    str(address) for address in self._resolver(GITHUB_API_HOST, GITHUB_API_PORT)
-                )
-            )
-        except SafeFetchError:
-            raise
-        except (OSError, RuntimeError, TypeError, ValueError) as exc:
-            raise SafeFetchError("dns_resolution_failed") from exc
-        if not resolved_addresses:
-            raise SafeFetchError("dns_resolution_failed")
-        for address in resolved_addresses:
-            _validated_global_ip(address, unavailable_code="dns_resolution_failed")
-        self._check_deadline(started_at, total_timeout)
-
         url = f"https://{GITHUB_API_HOST}/users/{normalized_username}"
+        return self._request_json(
+            host=GITHUB_API_HOST,
+            port=GITHUB_API_PORT,
+            method="GET",
+            url=url,
+            headers=self._github_headers(),
+        )
+
+    def search_github_users(
+        self,
+        full_name: str,
+        *,
+        per_page: int = GITHUB_MAX_USER_SEARCH_RESULTS,
+    ) -> SafeFetchResponse:
+        if self._settings is None:
+            raise SafeFetchError("safe_fetch_not_configured")
+        normalized_name = self._validate_full_name(full_name)
+        if (
+            not isinstance(per_page, int)
+            or isinstance(per_page, bool)
+            or not 1 <= per_page <= GITHUB_MAX_USER_SEARCH_RESULTS
+        ):
+            raise SafeFetchError("invalid_result_limit")
+        query = f'fullname:"{normalized_name}" type:user'
+        url = str(
+            httpx.URL(
+                f"https://{GITHUB_API_HOST}/search/users",
+                params={"q": query, "per_page": str(per_page)},
+            )
+        )
+        return self._request_json(
+            host=GITHUB_API_HOST,
+            port=GITHUB_API_PORT,
+            method="GET",
+            url=url,
+            headers=self._github_headers(),
+        )
+
+    def search_exa_people(
+        self,
+        query: str,
+        *,
+        num_results: int = EXA_MAX_PEOPLE_RESULTS,
+    ) -> SafeFetchResponse:
+        if self._settings is None:
+            raise SafeFetchError("safe_fetch_not_configured")
+        normalized_query = self._validate_query(query)
+        if (
+            not isinstance(num_results, int)
+            or isinstance(num_results, bool)
+            or not 1 <= num_results <= EXA_MAX_PEOPLE_RESULTS
+        ):
+            raise SafeFetchError("invalid_result_limit")
+        api_key = _secret_value(getattr(self._settings, "exa_api_key", None)).strip()
+        if not api_key:
+            raise SafeFetchError("exa_auth_required")
+        request_body = json.dumps(
+            {
+                "query": normalized_query,
+                "category": "people",
+                "type": "fast",
+                "numResults": num_results,
+                "contents": {
+                    "highlights": {
+                        "maxCharacters": EXA_HIGHLIGHT_MAX_CHARACTERS,
+                    }
+                },
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return self._request_json(
+            host=EXA_API_HOST,
+            port=EXA_API_PORT,
+            method="POST",
+            url=f"https://{EXA_API_HOST}/search",
+            headers={
+                "Accept": "application/json",
+                "Accept-Encoding": "identity",
+                "Cache-Control": "no-cache",
+                "Content-Type": "application/json",
+                "User-Agent": "public-profile-search-prototype/0.2",
+                "X-Api-Key": api_key,
+            },
+            body=request_body,
+        )
+
+    def _github_headers(self) -> dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
             "Accept-Encoding": "identity",
@@ -169,7 +242,26 @@ class SafeFetchGateway:
         api_token = _secret_value(getattr(self._settings, "github_api_token", None))
         if api_token:
             headers["Authorization"] = f"Bearer {api_token}"
+        return headers
 
+    def _request_json(
+        self,
+        *,
+        host: str,
+        port: int,
+        method: str,
+        url: str,
+        headers: Mapping[str, str],
+        body: bytes | None = None,
+    ) -> SafeFetchResponse:
+        maximum_bytes = self._positive_setting("safe_fetch_max_bytes")
+        total_timeout = self._positive_setting("safe_fetch_total_timeout_seconds")
+        connect_timeout = self._positive_setting("safe_fetch_connect_timeout_seconds")
+        read_timeout = self._positive_setting("safe_fetch_read_timeout_seconds")
+        started_at = self._monotonic()
+        self._validate_request_target(host, port, url)
+        self._validate_fixed_destination(host, port)
+        self._check_deadline(started_at, total_timeout)
         timeout = httpx.Timeout(
             connect=connect_timeout,
             read=read_timeout,
@@ -184,7 +276,7 @@ class SafeFetchGateway:
                     follow_redirects=False,
                     trust_env=False,
                 ) as client,
-                client.stream("GET", url, headers=headers) as response,
+                client.stream(method, url, headers=headers, content=body) as response,
             ):
                 self._check_deadline(started_at, total_timeout)
                 self._validate_peer(response)
@@ -212,11 +304,78 @@ class SafeFetchGateway:
         except httpx.RequestError as exc:
             raise SafeFetchError("network_error") from exc
 
+    def _validate_fixed_destination(self, host: str, port: int) -> None:
+        try:
+            resolved_addresses = tuple(
+                dict.fromkeys(str(address) for address in self._resolver(host, port))
+            )
+        except SafeFetchError:
+            raise
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            raise SafeFetchError("dns_resolution_failed") from exc
+        if not resolved_addresses:
+            raise SafeFetchError("dns_resolution_failed")
+        for address in resolved_addresses:
+            _validated_global_ip(address, unavailable_code="dns_resolution_failed")
+
+    @staticmethod
+    def _validate_request_target(host: str, port: int, url: str) -> None:
+        if (host, port) not in {
+            (EXA_API_HOST, EXA_API_PORT),
+            (GITHUB_API_HOST, GITHUB_API_PORT),
+        }:
+            raise SafeFetchError("unsafe_destination")
+        try:
+            parsed = urlsplit(url)
+            parsed_port = parsed.port
+        except (TypeError, ValueError) as exc:
+            raise SafeFetchError("unsafe_destination") from exc
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != host
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed_port is not None
+        ):
+            raise SafeFetchError("unsafe_destination")
+
     @staticmethod
     def _validate_username(username: str) -> str:
         if not isinstance(username, str) or not GITHUB_USERNAME_PATTERN.fullmatch(username):
             raise SafeFetchError("invalid_username")
         return username.lower()
+
+    @staticmethod
+    def _validate_full_name(full_name: str) -> str:
+        normalized = SafeFetchGateway._validate_search_text(
+            full_name,
+            maximum_length=160,
+            error_code="invalid_full_name",
+        )
+        if '"' in normalized or "\\" in normalized:
+            raise SafeFetchError("invalid_full_name")
+        return normalized
+
+    @staticmethod
+    def _validate_query(query: str) -> str:
+        return SafeFetchGateway._validate_search_text(
+            query,
+            maximum_length=500,
+            error_code="invalid_query",
+        )
+
+    @staticmethod
+    def _validate_search_text(value: str, *, maximum_length: int, error_code: str) -> str:
+        if not isinstance(value, str):
+            raise SafeFetchError(error_code)
+        normalized = " ".join(value.split())
+        if (
+            not normalized
+            or len(normalized) > maximum_length
+            or any(unicodedata.category(character).startswith("C") for character in normalized)
+        ):
+            raise SafeFetchError(error_code)
+        return normalized
 
     def _positive_setting(self, name: str) -> float:
         try:

@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.app.api.eligibility import router as eligibility_router
+from apps.api.app.api.footprint_jobs import router as footprint_jobs_router
 from apps.api.app.api.health import router as health_router
 from apps.api.app.api.search_jobs import router as search_jobs_router
 from apps.api.app.core.clock import Clock
@@ -76,6 +77,7 @@ def create_app(
 
     application.include_router(health_router)
     application.include_router(eligibility_router)
+    application.include_router(footprint_jobs_router)
     application.include_router(search_jobs_router)
     return application
 

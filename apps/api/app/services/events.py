@@ -16,9 +16,17 @@ def add_event(
     current = session.scalar(
         select(func.coalesce(func.max(JobEvent.sequence), 0)).where(JobEvent.job_id == job_id)
     )
+    pending = max(
+        (
+            event.sequence
+            for event in session.new
+            if isinstance(event, JobEvent) and event.job_id == job_id
+        ),
+        default=0,
+    )
     event = JobEvent(
         job_id=job_id,
-        sequence=int(current or 0) + 1,
+        sequence=max(int(current or 0), pending) + 1,
         event_type=event_type,
         message=message,
         terminal=terminal,

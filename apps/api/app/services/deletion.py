@@ -4,14 +4,20 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from apps.api.app.models.entities import (
+    AccountNode,
     AnalysisRevision,
     Claim,
     ClaimEvidence,
     CollectionSnapshot,
+    DiscoveredIdentifier,
+    DiscoveryEdge,
+    GroundedSynthesisResult,
     IdempotencyRecord,
     JobAttempt,
     JobDeletionTombstone,
     JobEvent,
+    MaigretScanRun,
+    MaigretSiteCheck,
     OutboxMessage,
     ProviderAttempt,
     ProviderRun,
@@ -59,6 +65,13 @@ def delete_job(session: Session, *, job_id: str, user_id: str, now) -> None:
         session.execute(
             delete(ReportAccessState).where(ReportAccessState.report_id.in_(report_ids))
         )
+    session.execute(delete(DiscoveredIdentifier).where(DiscoveredIdentifier.job_id == job_id))
+    session.execute(delete(DiscoveryEdge).where(DiscoveryEdge.job_id == job_id))
+    session.execute(delete(GroundedSynthesisResult).where(GroundedSynthesisResult.job_id == job_id))
+    session.execute(delete(AccountNode).where(AccountNode.job_id == job_id))
+    session.execute(delete(MaigretSiteCheck).where(MaigretSiteCheck.job_id == job_id))
+    if run_ids:
+        session.execute(delete(MaigretScanRun).where(MaigretScanRun.provider_run_id.in_(run_ids)))
     session.execute(delete(ReportRevision).where(ReportRevision.job_id == job_id))
     session.execute(delete(AnalysisRevision).where(AnalysisRevision.job_id == job_id))
     session.execute(delete(CollectionSnapshot).where(CollectionSnapshot.job_id == job_id))

@@ -25,7 +25,36 @@ class ProfileTarget:
     canonicalization_version: str = "profile-url-v1"
 
 
+@dataclass(frozen=True)
+class FootprintProfileTarget:
+    platform: str
+    canonical_url: str
+    handle: str
+    canonicalization_version: str = "footprint-profile-url-v1"
+
+
 GITHUB_LOGIN_PATTERN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\Z")
+FOOTPRINT_HANDLE_PATTERNS = {
+    "github": GITHUB_LOGIN_PATTERN,
+    "instagram": re.compile(
+        r"(?=.{1,30}\Z)(?!.*\.\.)[A-Za-z0-9_](?:[A-Za-z0-9._]*[A-Za-z0-9_])?\Z"
+    ),
+    "linkedin": re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,63})\Z"),
+    "reddit": re.compile(r"[A-Za-z0-9_-]{1,20}\Z"),
+    "tiktok": re.compile(r"[A-Za-z0-9._]{1,24}\Z"),
+    "x": re.compile(r"[A-Za-z0-9_]{1,15}\Z"),
+    "youtube": re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,29})\Z"),
+}
+FOOTPRINT_PROFILE_HOSTS = {
+    "github.com": "github",
+    "instagram.com": "instagram",
+    "linkedin.com": "linkedin",
+    "reddit.com": "reddit",
+    "tiktok.com": "tiktok",
+    "twitter.com": "x",
+    "x.com": "x",
+    "youtube.com": "youtube",
+}
 
 
 def _reject_ambiguous_url_syntax(value: str) -> str:
@@ -94,6 +123,76 @@ def canonicalize_github_profile_url(value: str) -> ProfileTarget:
         canonical_url=f"https://github.com/{normalized_login}",
         handle=normalized_login,
         fixture_key=None,
+    )
+
+
+def canonicalize_footprint_profile_url(value: str) -> FootprintProfileTarget:
+    stripped = _reject_ambiguous_url_syntax(value)
+    try:
+        parts = urlsplit(stripped)
+        port = parts.port
+    except ValueError as exc:
+        raise UnsafePrototypeUrl("The profile URL is invalid") from exc
+    if parts.scheme.casefold() != "https":
+        raise UnsafePrototypeUrl("Only HTTPS profile URLs are accepted")
+    if not parts.hostname or parts.username or parts.password or port is not None:
+        raise UnsafePrototypeUrl("Credentials and ports are not accepted")
+    if parts.query or parts.fragment:
+        raise UnsafePrototypeUrl("Query strings and fragments are not accepted")
+
+    hostname = parts.hostname.casefold()
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+    platform = FOOTPRINT_PROFILE_HOSTS.get(hostname)
+    if platform is None:
+        raise UnsafePrototypeUrl("The profile host is unsupported")
+
+    path = parts.path
+    if not path.startswith("/") or "//" in path:
+        raise UnsafePrototypeUrl("A direct profile URL is required")
+    if path.endswith("/"):
+        path = path[:-1]
+    segments = path[1:].split("/") if len(path) > 1 else []
+
+    handle = ""
+    canonical_path = ""
+    if platform in {"github", "instagram", "x"} and len(segments) == 1:
+        handle = segments[0]
+        canonical_path = f"/{handle}"
+    elif (
+        platform == "linkedin"
+        and len(segments) == 2
+        and segments[0].casefold() == "in"
+    ):
+        handle = segments[1]
+        canonical_path = f"/in/{handle}"
+    elif (
+        platform == "reddit"
+        and len(segments) == 2
+        and segments[0].casefold() in {"u", "user"}
+    ):
+        handle = segments[1]
+        canonical_path = f"/user/{handle}"
+    elif (
+        platform in {"tiktok", "youtube"}
+        and len(segments) == 1
+        and segments[0].startswith("@")
+    ):
+        handle = segments[0][1:]
+        canonical_path = f"/@{handle}"
+    else:
+        raise UnsafePrototypeUrl("A direct profile URL is required")
+
+    pattern = FOOTPRINT_HANDLE_PATTERNS[platform]
+    if not pattern.fullmatch(handle):
+        raise UnsafePrototypeUrl("The profile handle is invalid")
+    normalized_handle = handle.casefold()
+    canonical_host = "x.com" if platform == "x" else hostname
+    canonical_path = canonical_path[: -len(handle)] + normalized_handle
+    return FootprintProfileTarget(
+        platform=platform,
+        canonical_url=f"https://{canonical_host}{canonical_path}",
+        handle=normalized_handle,
     )
 
 

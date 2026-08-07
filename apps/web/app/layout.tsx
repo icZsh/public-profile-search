@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Tracebrief — public profile self-audit prototype",
+  title: "Tracebrief — public digital footprint discovery",
   description:
-    "A local, eligibility-gated prototype for deterministic public profile briefs.",
+    "A local prototype for discovering and inspecting possible public account links.",
   robots: {
     index: false,
     follow: false,

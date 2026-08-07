@@ -12,6 +12,27 @@ errors:
   idempotency_conflict:
     http_status: 409
     message: This idempotency key was already used for a different request.
+  anchor_candidate_not_found:
+    http_status: 404
+    message: The anchor candidate was not found for this discovery job.
+  anchor_candidate_invalid:
+    http_status: 422
+    message: Only a usable exact-handle candidate can be selected as the search anchor.
+  anchor_candidate_not_hypothesis:
+    http_status: 422
+    message: The selected account does not participate in a plausible name hypothesis.
+  anchor_selection_not_required:
+    http_status: 409
+    message: This discovery job already has a platform anchor.
+  anchor_selection_closed:
+    http_status: 409
+    message: This discovery job has already been finalized.
+  anchor_selection_expired:
+    http_status: 409
+    message: The anchor selection window has closed.
+  anchor_selection_unavailable:
+    http_status: 409
+    message: This discovery job is not waiting for an anchor selection.
   job_not_found:
     http_status: 404
     message: The job was not found.

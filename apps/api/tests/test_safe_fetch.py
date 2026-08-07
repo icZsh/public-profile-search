@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from types import SimpleNamespace
 
@@ -17,6 +18,7 @@ PUBLIC_IP = "140.82.112.3"
 
 def safe_fetch_settings(**overrides):
     values = {
+        "exa_api_key": "exa-server-secret",
         "github_api_version": "2026-03-10",
         "github_api_token": None,
         "safe_fetch_max_bytes": 256,
@@ -90,6 +92,82 @@ def test_server_side_token_is_used_without_entering_response_headers():
 
     assert response.headers["x-ratelimit-remaining"] == "59"
     assert "authorization" not in response.headers
+
+
+def test_exa_people_search_is_fixed_host_bounded_and_has_no_domain_filter():
+    observed: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed["method"] = request.method
+        observed["url"] = str(request.url)
+        observed["headers"] = request.headers
+        observed["body"] = request.content
+        return json_response(content=b'{"results":[]}')
+
+    response = gateway(handler).search_exa_people("  Alice   Example  ", num_results=5)
+
+    assert response.status_code == 200
+    assert observed["method"] == "POST"
+    assert observed["url"] == "https://api.exa.ai/search"
+    headers = observed["headers"]
+    assert isinstance(headers, httpx.Headers)
+    assert headers["x-api-key"] == "exa-server-secret"
+    body = json.loads(observed["body"])
+    assert body == {
+        "query": "Alice Example",
+        "category": "people",
+        "type": "fast",
+        "numResults": 5,
+        "contents": {"highlights": {"maxCharacters": 1_000}},
+    }
+    assert "includeDomains" not in body
+    assert "excludeDomains" not in body
+
+
+def test_exa_people_search_rejects_missing_key_and_wider_result_limit_before_network():
+    called = False
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return json_response()
+
+    with pytest.raises(SafeFetchError) as missing_key:
+        gateway(
+            handler,
+            settings_overrides={"exa_api_key": None},
+        ).search_exa_people("Alice Example")
+    assert missing_key.value.code == "exa_auth_required"
+
+    with pytest.raises(SafeFetchError) as wide_limit:
+        gateway(handler).search_exa_people("Alice Example", num_results=6)
+    assert wide_limit.value.code == "invalid_result_limit"
+    assert not called
+
+
+def test_github_user_search_uses_only_fixed_query_shape_and_three_result_cap():
+    observed: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed["method"] = request.method
+        observed["url"] = request.url
+        return json_response(content=b'{"total_count":0,"items":[]}')
+
+    response = gateway(handler).search_github_users("  Alice   Example  ", per_page=3)
+
+    assert response.status_code == 200
+    assert observed["method"] == "GET"
+    url = observed["url"]
+    assert isinstance(url, httpx.URL)
+    assert url.scheme == "https"
+    assert url.host == "api.github.com"
+    assert url.path == "/search/users"
+    assert url.params["q"] == 'fullname:"Alice Example" type:user'
+    assert url.params["per_page"] == "3"
+
+    with pytest.raises(SafeFetchError) as exc_info:
+        gateway(handler).search_github_users("Alice Example", per_page=4)
+    assert exc_info.value.code == "invalid_result_limit"
 
 
 @pytest.mark.parametrize(

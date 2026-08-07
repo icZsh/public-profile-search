@@ -1,10 +1,16 @@
 import type {
+  CandidateList,
   CreateSearchJobRequest,
+  CreateFootprintJobRequest,
   EligibilityVerification,
   EvidenceItem,
   FastBrief,
+  FootprintBrief,
+  FootprintJob,
   PrototypeConfig,
   SearchJob,
+  SelectFootprintAnchorRequest,
+  SelectFootprintAnchorResponse,
 } from "@public-profile-search/generated-api-client";
 
 const API_BASE_URL =
@@ -174,4 +180,91 @@ export async function deleteSearchJob(jobId: string): Promise<void> {
   if (!response.ok) {
     throw new Error("The job could not be deleted.");
   }
+}
+
+export async function createFootprintJob(
+  payload: CreateFootprintJobRequest,
+  idempotencyKey = crypto.randomUUID(),
+): Promise<FootprintJob> {
+  return unwrap(
+    await fetch(`${API_BASE_URL}/v1/footprint-jobs`, {
+      method: "POST",
+      headers: headers({ "Idempotency-Key": idempotencyKey }),
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export async function getFootprintJob(jobId: string): Promise<FootprintJob> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}`,
+      {
+        headers: headers(),
+        cache: "no-store",
+      },
+    ),
+  );
+}
+
+export async function getFootprintCandidates(
+  jobId: string,
+): Promise<CandidateList> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/candidates`,
+      {
+        headers: headers(),
+        cache: "no-store",
+      },
+    ),
+  );
+}
+
+export async function selectFootprintAnchor(
+  jobId: string,
+  candidateId: string,
+): Promise<SelectFootprintAnchorResponse> {
+  const payload: SelectFootprintAnchorRequest = {
+    candidate_id: candidateId,
+  };
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/anchor`,
+      {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload),
+      },
+    ),
+  );
+}
+
+export async function getFootprintBrief(
+  jobId: string,
+): Promise<FootprintBrief> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/brief`,
+      {
+        headers: headers(),
+        cache: "no-store",
+      },
+    ),
+  );
+}
+
+export async function getFootprintEvidence(
+  jobId: string,
+): Promise<EvidenceItem[]> {
+  const response = await unwrap<{ items: EvidenceItem[] }>(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/evidence`,
+      {
+        headers: headers(),
+        cache: "no-store",
+      },
+    ),
+  );
+  return response.items;
 }
