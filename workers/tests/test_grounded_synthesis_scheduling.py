@@ -242,7 +242,7 @@ def test_deep_mode_snapshots_openrouter_gateway_and_model():
         assert run.logical_run_id == "synthesis:openrouter:grounded:v2"
         assert run.query_config["gateway"] == "openrouter"
         assert run.query_config["model"] == "~deepseek/deepseek-v4-flash-latest"
-        assert run.query_config["max_output_tokens"] == 32_000
+        assert run.query_config["max_output_tokens"] == 16_000
         assert run.query_config["max_attempts"] == 3
         assert run.query_config["retry_backoff_seconds"] == 2
 

@@ -59,7 +59,7 @@ class Settings(BaseSettings):
         ),
     )
     grounded_synthesis_max_output_tokens: int = Field(
-        default=32_000,
+        default=16_000,
         ge=800,
         le=32_000,
         validation_alias=AliasChoices(

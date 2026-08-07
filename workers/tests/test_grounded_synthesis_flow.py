@@ -380,6 +380,115 @@ def test_synthesis_service_materializes_sources_calls_runner_and_persists(monkey
         assert attempt.completion_disposition == "in_budget"
 
 
+def test_synthesis_retries_truncation_with_a_wider_output_budget(monkeypatch):
+    # A truncated response is only worth retrying if the retry gets more room,
+    # so the budget has to widen toward the ceiling on each attempt.
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _session_factory()
+    _job_id, _attempt_id, run_id, _check_id = _add_deep_synthesis_run(factory, now=now)
+    with factory() as session, session.begin():
+        run = session.get(ProviderRun, run_id)
+        assert run is not None
+        run.query_config = {
+            **dict(run.query_config),
+            "max_output_tokens": 16_000,
+            "max_attempts": 3,
+            "retry_backoff_seconds": 0,
+        }
+
+    budgets = []
+
+    def truncating_runner(**kwargs):
+        budgets.append(kwargs["max_output_tokens"])
+        if len(budgets) < 3:
+            return GroundedSynthesisOutcome(
+                status="invalid_response",
+                output=None,
+                usage=SynthesisUsage(input_tokens=100, output_tokens=30, total_tokens=130),
+                error_code="openai_incomplete_max_output_tokens",
+                input_checksum="a" * 64,
+                response_id="resp_truncated",
+                model=kwargs["model"],
+            )
+        return GroundedSynthesisOutcome(
+            status="success",
+            output=_success_output(kwargs["sources"][0].source_id),
+            usage=SynthesisUsage(input_tokens=100, output_tokens=50, total_tokens=150),
+            error_code=None,
+            input_checksum="a" * 64,
+            response_id="resp_success",
+            model=kwargs["model"],
+        )
+
+    monkeypatch.setattr(
+        maigret_runs_service,
+        "finalize_discovery_if_complete",
+        lambda *args, **kwargs: True,
+    )
+    process_grounded_synthesis_run(
+        factory,
+        settings=_settings(),
+        clock=FixedClock(now),
+        provider_run_id=run_id,
+        synthesizer=truncating_runner,
+    )
+
+    assert budgets == [16_000, 24_000, 32_000]
+    with factory() as session:
+        run = session.get(ProviderRun, run_id)
+        assert run is not None and run.status == "success"
+
+
+def test_synthesis_stops_retrying_truncation_once_at_the_ceiling(monkeypatch):
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _session_factory()
+    _job_id, _attempt_id, run_id, _check_id = _add_deep_synthesis_run(factory, now=now)
+    with factory() as session, session.begin():
+        run = session.get(ProviderRun, run_id)
+        assert run is not None
+        run.query_config = {
+            **dict(run.query_config),
+            "max_output_tokens": 32_000,
+            "max_attempts": 3,
+            "retry_backoff_seconds": 0,
+        }
+
+    calls = 0
+
+    def truncating_runner(**kwargs):
+        nonlocal calls
+        calls += 1
+        return GroundedSynthesisOutcome(
+            status="invalid_response",
+            output=None,
+            usage=SynthesisUsage(input_tokens=100, output_tokens=30, total_tokens=130),
+            error_code="openai_incomplete_max_output_tokens",
+            input_checksum="a" * 64,
+            response_id="resp_truncated",
+            model=kwargs["model"],
+        )
+
+    monkeypatch.setattr(
+        maigret_runs_service,
+        "finalize_discovery_if_complete",
+        lambda *args, **kwargs: True,
+    )
+    process_grounded_synthesis_run(
+        factory,
+        settings=_settings(),
+        clock=FixedClock(now),
+        provider_run_id=run_id,
+        synthesizer=truncating_runner,
+    )
+
+    # No headroom left, so the identical call is not repeated.
+    assert calls == 1
+    with factory() as session:
+        result = session.get(GroundedSynthesisResult, run_id)
+        assert result is not None
+        assert result.error_code == "openai_incomplete_max_output_tokens"
+
+
 def test_synthesis_retries_transient_openrouter_failure_and_aggregates_usage(
     monkeypatch,
 ):

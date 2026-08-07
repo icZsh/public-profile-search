@@ -75,6 +75,14 @@ _RETRYABLE_OPENROUTER_ERRORS = {
     "openrouter_timeout",
     "openrouter_unavailable",
 }
+# A response that ran out of the output budget is retryable on either gateway,
+# but only if the retry gets more room -- repeating the same cap just truncates
+# again. _escalated_output_limit widens the cap toward the schema ceiling.
+_TRUNCATION_ERRORS = {
+    "openai_incomplete_max_output_tokens",
+    "openrouter_incomplete_max_output_tokens",
+}
+_MAX_OUTPUT_TOKEN_CEILING = 32_000
 _SOURCE_TYPE_PRIORITY = {
     "first_party_profile": 0,
     "first_party_profile_api": 0,
@@ -666,6 +674,17 @@ def _execute_synthesis(
         ):
             return outcome
 
+        if outcome.error_code in _TRUNCATION_ERRORS:
+            escalated = _escalated_output_limit(
+                runner_kwargs["max_output_tokens"],
+                attempts_remaining=max_attempts - attempt_index - 1,
+            )
+            if escalated is None:
+                # Already at the ceiling; another identical call would truncate
+                # in the same place, so fall back to the deterministic brief.
+                return outcome
+            runner_kwargs["max_output_tokens"] = escalated
+
         delay_seconds = min(
             30,
             retry_backoff_seconds * (2**attempt_index),
@@ -678,7 +697,23 @@ def _execute_synthesis(
 
 
 def _retryable_synthesis_outcome(outcome: GroundedSynthesisOutcome) -> bool:
-    return outcome.error_code in _RETRYABLE_OPENROUTER_ERRORS
+    return (
+        outcome.error_code in _RETRYABLE_OPENROUTER_ERRORS
+        or outcome.error_code in _TRUNCATION_ERRORS
+    )
+
+
+def _escalated_output_limit(current: int, *, attempts_remaining: int) -> int | None:
+    """Widen the output budget after a truncation, in even steps to the ceiling.
+
+    Returns None once the ceiling is already in force, since repeating the same
+    budget would truncate at the same place.
+    """
+
+    if current >= _MAX_OUTPUT_TOKEN_CEILING or attempts_remaining < 1:
+        return None
+    step = (_MAX_OUTPUT_TOKEN_CEILING - current) // attempts_remaining
+    return min(_MAX_OUTPUT_TOKEN_CEILING, current + max(step, 1))
 
 
 def _combined_usage(

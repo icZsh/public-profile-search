@@ -124,9 +124,9 @@ def schedule_grounded_synthesis_if_ready(
                 getattr(
                     settings,
                     "grounded_synthesis_max_output_tokens",
-                    getattr(settings, "openai_synthesis_max_output_tokens", 32_000),
+                    getattr(settings, "openai_synthesis_max_output_tokens", 16_000),
                 ),
-                default=32_000,
+                default=16_000,
                 minimum=800,
                 maximum=32_000,
             ),
