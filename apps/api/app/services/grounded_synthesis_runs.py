@@ -57,31 +57,33 @@ _RESULT_STATUSES = {
     "provider_error",
     "invalid_response",
 }
-_RETRYABLE_OPENROUTER_ERRORS = {
-    "openrouter_provider_overloaded",
-    "openrouter_provider_unavailable",
-    "openrouter_output_account_mismatch",
-    "openrouter_output_contains_contact_data",
-    "openrouter_output_invalid_json",
-    "openrouter_output_schema_invalid",
-    "openrouter_output_unknown_account_id",
-    "openrouter_output_unknown_source_id",
-    "openrouter_output_unknown_url",
-    "openrouter_rate_limit_exceeded",
-    "openrouter_rate_limited",
-    "openrouter_request_timeout",
-    "openrouter_response_text_missing",
-    "openrouter_server",
-    "openrouter_timeout",
-    "openrouter_unavailable",
+# Synthesis error codes are gateway-agnostic, so this set covers whichever
+# gateway is configured. The output_* codes are model-output defects -- invalid
+# JSON, a fabricated URL, a citation to a source that was never in the packet --
+# which a fresh sample often gets right.
+_RETRYABLE_SYNTHESIS_ERRORS = {
+    "network_error",
+    "output_account_mismatch",
+    "output_contains_contact_data",
+    "output_invalid_json",
+    "output_schema_invalid",
+    "output_unknown_account_id",
+    "output_unknown_source_id",
+    "output_unknown_url",
+    "provider_overloaded",
+    "provider_unavailable",
+    "rate_limit_exceeded",
+    "rate_limited",
+    "request_timeout",
+    "response_text_missing",
+    "server",
+    "timeout",
+    "unavailable",
 }
-# A response that ran out of the output budget is retryable on either gateway,
-# but only if the retry gets more room -- repeating the same cap just truncates
-# again. _escalated_output_limit widens the cap toward the schema ceiling.
-_TRUNCATION_ERRORS = {
-    "openai_incomplete_max_output_tokens",
-    "openrouter_incomplete_max_output_tokens",
-}
+# A response that ran out of the output budget is retryable, but only if the
+# retry gets more room -- repeating the same cap just truncates again.
+# _escalated_output_limit widens the cap toward the schema ceiling.
+_TRUNCATION_ERRORS = {"incomplete_max_output_tokens"}
 _MAX_OUTPUT_TOKEN_CEILING = 32_000
 _SOURCE_TYPE_PRIORITY = {
     "first_party_profile": 0,
@@ -698,7 +700,7 @@ def _execute_synthesis(
 
 def _retryable_synthesis_outcome(outcome: GroundedSynthesisOutcome) -> bool:
     return (
-        outcome.error_code in _RETRYABLE_OPENROUTER_ERRORS
+        outcome.error_code in _RETRYABLE_SYNTHESIS_ERRORS
         or outcome.error_code in _TRUNCATION_ERRORS
     )
 

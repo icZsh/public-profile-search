@@ -380,6 +380,67 @@ def test_synthesis_service_materializes_sources_calls_runner_and_persists(monkey
         assert attempt.completion_disposition == "in_budget"
 
 
+def test_synthesis_retries_model_output_defects_on_the_openai_gateway(monkeypatch):
+    # Error codes carry no gateway prefix, so the retry set applies to whichever
+    # gateway is configured. This previously only retried on OpenRouter, which
+    # left the default gateway with no retries at all.
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _session_factory()
+    _job_id, _attempt_id, run_id, _check_id = _add_deep_synthesis_run(factory, now=now)
+    with factory() as session, session.begin():
+        run = session.get(ProviderRun, run_id)
+        assert run is not None
+        run.query_config = {
+            **dict(run.query_config),
+            "gateway": "openai",
+            "max_attempts": 3,
+            "retry_backoff_seconds": 0,
+        }
+
+    calls = 0
+
+    def flaky_runner(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return GroundedSynthesisOutcome(
+                status="invalid_response",
+                output=None,
+                usage=SynthesisUsage(input_tokens=100, output_tokens=30, total_tokens=130),
+                error_code="output_unknown_source_id",
+                input_checksum="a" * 64,
+                response_id="resp_ungrounded",
+                model=kwargs["model"],
+            )
+        return GroundedSynthesisOutcome(
+            status="success",
+            output=_success_output(kwargs["sources"][0].source_id),
+            usage=SynthesisUsage(input_tokens=100, output_tokens=50, total_tokens=150),
+            error_code=None,
+            input_checksum="a" * 64,
+            response_id="resp_success",
+            model=kwargs["model"],
+        )
+
+    monkeypatch.setattr(
+        maigret_runs_service,
+        "finalize_discovery_if_complete",
+        lambda *args, **kwargs: True,
+    )
+    process_grounded_synthesis_run(
+        factory,
+        settings=_settings(),
+        clock=FixedClock(now),
+        provider_run_id=run_id,
+        synthesizer=flaky_runner,
+    )
+
+    assert calls == 2
+    with factory() as session:
+        run = session.get(ProviderRun, run_id)
+        assert run is not None and run.status == "success"
+
+
 def test_synthesis_retries_truncation_with_a_wider_output_budget(monkeypatch):
     # A truncated response is only worth retrying if the retry gets more room,
     # so the budget has to widen toward the ceiling on each attempt.
@@ -405,7 +466,7 @@ def test_synthesis_retries_truncation_with_a_wider_output_budget(monkeypatch):
                 status="invalid_response",
                 output=None,
                 usage=SynthesisUsage(input_tokens=100, output_tokens=30, total_tokens=130),
-                error_code="openai_incomplete_max_output_tokens",
+                error_code="incomplete_max_output_tokens",
                 input_checksum="a" * 64,
                 response_id="resp_truncated",
                 model=kwargs["model"],
@@ -462,7 +523,7 @@ def test_synthesis_stops_retrying_truncation_once_at_the_ceiling(monkeypatch):
             status="invalid_response",
             output=None,
             usage=SynthesisUsage(input_tokens=100, output_tokens=30, total_tokens=130),
-            error_code="openai_incomplete_max_output_tokens",
+            error_code="incomplete_max_output_tokens",
             input_checksum="a" * 64,
             response_id="resp_truncated",
             model=kwargs["model"],
@@ -486,7 +547,7 @@ def test_synthesis_stops_retrying_truncation_once_at_the_ceiling(monkeypatch):
     with factory() as session:
         result = session.get(GroundedSynthesisResult, run_id)
         assert result is not None
-        assert result.error_code == "openai_incomplete_max_output_tokens"
+        assert result.error_code == "incomplete_max_output_tokens"
 
 
 def test_synthesis_retries_transient_openrouter_failure_and_aggregates_usage(
@@ -523,7 +584,7 @@ def test_synthesis_retries_transient_openrouter_failure_and_aggregates_usage(
                     output_tokens=30,
                     total_tokens=130,
                 ),
-                error_code="openrouter_provider_unavailable",
+                error_code="provider_unavailable",
                 input_checksum="a" * 64,
                 response_id="resp_failed",
                 model=kwargs["model"],
@@ -604,7 +665,7 @@ def test_synthesis_exhausts_transient_retries_before_persisting_fallback(
                 output_tokens=5,
                 total_tokens=15,
             ),
-            error_code="openrouter_provider_unavailable",
+            error_code="provider_unavailable",
             input_checksum="c" * 64,
             response_id=f"resp_failed_{calls}",
             model=kwargs["model"],
@@ -632,7 +693,7 @@ def test_synthesis_exhausts_transient_retries_before_persisting_fallback(
             )
         )
         assert result is not None and result.status == "provider_error"
-        assert result.error_code == "openrouter_provider_unavailable"
+        assert result.error_code == "provider_unavailable"
         assert result.usage == {
             "input_tokens": 30,
             "output_tokens": 15,
@@ -659,7 +720,7 @@ def test_synthesis_does_not_retry_model_refusal(monkeypatch):
             status="invalid_response",
             output=None,
             usage=None,
-            error_code="openrouter_response_refusal",
+            error_code="response_refusal",
             input_checksum="b" * 64,
             response_id="resp_invalid",
             model=kwargs["model"],
@@ -705,7 +766,7 @@ def test_synthesis_service_uses_snapshotted_openrouter_gateway(monkeypatch):
             status="no_result",
             output=None,
             usage=None,
-            error_code="openrouter_synthesis_no_evidence",
+            error_code="synthesis_no_evidence",
             input_checksum="a" * 64,
             response_id=None,
             model=kwargs["model"],
@@ -770,7 +831,7 @@ def test_synthesis_service_missing_key_persists_fallback_without_network(monkeyp
         result = session.get(GroundedSynthesisResult, run_id)
         assert run is not None and run.status == "skipped_configuration"
         assert result is not None and result.output is None
-        assert result.error_code == "openai_api_key_missing"
+        assert result.error_code == "api_key_missing"
 
 
 def test_synthesis_service_never_runs_for_quick_job():

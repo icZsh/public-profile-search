@@ -160,7 +160,7 @@ def test_deep_mode_records_missing_key_and_continues_without_outbox():
         result = session.get(GroundedSynthesisResult, run.id if run else "")
         assert run is not None and run.status == "skipped_configuration"
         assert result is not None
-        assert result.error_code == "openai_api_key_missing"
+        assert result.error_code == "api_key_missing"
         assert session.scalar(select(func.count(OutboxMessage.id))) == 0
 
 
@@ -277,7 +277,7 @@ def test_deep_mode_records_missing_openrouter_key():
         assert run is not None and run.status == "skipped_configuration"
         assert run.query_config["gateway"] == "openrouter"
         assert result is not None
-        assert result.error_code == "openrouter_api_key_missing"
+        assert result.error_code == "api_key_missing"
 
 
 def test_deep_mode_waits_for_nonterminal_retrieval():

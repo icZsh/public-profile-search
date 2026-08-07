@@ -602,7 +602,7 @@ def test_v1_persisted_output_remains_loadable_but_provider_validation_requires_v
             require_rich_v2=True,
         )
 
-    assert exc_info.value.code == "openai_output_schema_version_invalid"
+    assert exc_info.value.code == "output_schema_version_invalid"
 
 
 def test_v2_persisted_output_remains_loadable_without_subject_profile():
@@ -654,7 +654,7 @@ def test_current_provider_validation_rejects_implicit_legacy_defaults(mutate):
             require_rich_v2=True,
         )
 
-    assert exc_info.value.code == "openai_output_schema_invalid"
+    assert exc_info.value.code == "output_schema_invalid"
 
 
 def test_v3_profile_answer_semantics_are_left_for_host_normalization():
@@ -811,39 +811,39 @@ def test_numeric_public_handle_is_not_misclassified_as_contact_data():
     [
         (
             lambda value: value.update(summary_source_ids=["unknown-source"]),
-            "openai_output_unknown_source_id",
+            "output_unknown_source_id",
         ),
         (
             lambda value: value.update(
                 summary="Contact Alice at alice@example.test for more information."
             ),
-            "openai_output_contains_contact_data",
+            "output_contains_contact_data",
         ),
         (
             lambda value: value.update(
                 summary="A different profile appears at https://example.com/invented."
             ),
-            "openai_output_unknown_url",
+            "output_unknown_url",
         ),
         (
             lambda value: value["claims"][0].update(predicate="person.private_contact"),
-            "openai_output_schema_invalid",
+            "output_schema_invalid",
         ),
         (
             lambda value: value["account_assessments"][0].update(account_id="unknown-account"),
-            "openai_output_unknown_account_id",
+            "output_unknown_account_id",
         ),
         (
             lambda value: value["account_assessments"][0].update(
                 canonical_url="https://github.com/alice-source-1"
             ),
-            "openai_output_account_mismatch",
+            "output_account_mismatch",
         ),
         (
             lambda value: value["subject_profile"]["career_timeline"][0].update(
                 source_ids=["unknown-source"]
             ),
-            "openai_output_unknown_source_id",
+            "output_unknown_source_id",
         ),
     ],
 )
@@ -986,7 +986,7 @@ def test_cancellation_event_aborts_inflight_unbounded_http_request():
 
     assert transport.cancelled.is_set()
     assert outcome.status == "provider_error"
-    assert outcome.error_code == "openai_request_cancelled"
+    assert outcome.error_code == "request_cancelled"
 
 
 def test_openrouter_client_uses_fixed_host_headers_model_schema_and_private_routing():
@@ -1056,7 +1056,7 @@ def test_openrouter_missing_key_skips_without_network():
     )
 
     assert outcome.status == "skipped_configuration"
-    assert outcome.error_code == "openrouter_api_key_missing"
+    assert outcome.error_code == "api_key_missing"
     assert outcome.used_deterministic_fallback is True
     assert not called
 
@@ -1091,7 +1091,7 @@ def test_openrouter_failed_response_maps_top_level_typed_error(
     )
 
     assert outcome.status == expected_status
-    assert outcome.error_code == f"openrouter_{error_type}"
+    assert outcome.error_code == error_type
     assert outcome.output is None
 
 
@@ -1117,7 +1117,7 @@ def test_openrouter_http_error_prefers_typed_error_over_lossy_status():
     )
 
     assert outcome.status == "auth_required"
-    assert outcome.error_code == "openrouter_authentication"
+    assert outcome.error_code == "authentication"
 
 
 def test_missing_key_and_empty_evidence_skip_without_network():
@@ -1141,10 +1141,10 @@ def test_missing_key_and_empty_evidence_skip_without_network():
     )
 
     assert missing_key.status == "skipped_configuration"
-    assert missing_key.error_code == "openai_api_key_missing"
+    assert missing_key.error_code == "api_key_missing"
     assert missing_key.used_deterministic_fallback is True
     assert no_evidence.status == "no_result"
-    assert no_evidence.error_code == "openai_synthesis_no_evidence"
+    assert no_evidence.error_code == "synthesis_no_evidence"
     assert not called
 
 
@@ -1188,7 +1188,7 @@ def test_completed_response_accepts_a_single_wrapped_json_object(render):
                 "status": "incomplete",
                 "incomplete_details": {"reason": "max_output_tokens"},
             },
-            "openai_incomplete_max_output_tokens",
+            "incomplete_max_output_tokens",
         ),
         (
             _api_payload(
@@ -1207,7 +1207,7 @@ def test_completed_response_accepts_a_single_wrapped_json_object(render):
                     }
                 ],
             ),
-            "openai_response_refusal",
+            "response_refusal",
         ),
         (
             _api_payload(
@@ -1221,7 +1221,7 @@ def test_completed_response_accepts_a_single_wrapped_json_object(render):
                     }
                 ],
             ),
-            "openai_output_invalid_json",
+            "output_invalid_json",
         ),
     ],
 )
@@ -1254,7 +1254,7 @@ def test_ungrounded_model_output_becomes_fallback():
     )
 
     assert outcome.status == "invalid_response"
-    assert outcome.error_code == "openai_output_unknown_source_id"
+    assert outcome.error_code == "output_unknown_source_id"
     assert outcome.output is None
 
 
@@ -1268,17 +1268,17 @@ def test_provider_response_using_legacy_shape_becomes_fallback():
     )
 
     assert outcome.status == "invalid_response"
-    assert outcome.error_code == "openai_output_schema_version_invalid"
+    assert outcome.error_code == "output_schema_version_invalid"
     assert outcome.output is None
 
 
 @pytest.mark.parametrize(
     ("status_code", "expected_status", "expected_code"),
     [
-        (401, "auth_required", "openai_auth_required"),
-        (429, "rate_limited", "openai_rate_limited"),
-        (500, "provider_error", "openai_unavailable"),
-        (422, "invalid_response", "openai_unexpected_status"),
+        (401, "auth_required", "auth_required"),
+        (429, "rate_limited", "rate_limited"),
+        (500, "provider_error", "unavailable"),
+        (422, "invalid_response", "unexpected_status"),
     ],
 )
 def test_http_errors_become_provider_compatible_fallbacks(
@@ -1310,7 +1310,7 @@ def test_timeout_becomes_fallback():
     )
 
     assert outcome.status == "timeout"
-    assert outcome.error_code == "openai_request_timeout"
+    assert outcome.error_code == "request_timeout"
 
 
 def test_high_level_callable_builds_packet_and_has_stable_checksum():

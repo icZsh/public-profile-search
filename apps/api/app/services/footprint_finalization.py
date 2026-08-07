@@ -1907,6 +1907,9 @@ def _synthesis_fallback(
 ) -> _SynthesisView:
     missing_configuration = reason in {
         "grounded_synthesis_disabled",
+        "api_key_missing",
+        # Reports stay readable for the retention window, so results written
+        # before error codes dropped their gateway prefix still resolve here.
         "openai_api_key_missing",
         "openrouter_api_key_missing",
     }

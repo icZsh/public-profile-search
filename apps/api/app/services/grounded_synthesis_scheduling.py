@@ -84,7 +84,6 @@ def schedule_grounded_synthesis_if_ready(
         key_present = _secret_present(
             getattr(settings, "openrouter_api_key", None)
         )
-        missing_key_code = "openrouter_api_key_missing"
     else:
         model = _bounded_text(
             getattr(settings, "openai_synthesis_model", "gpt-5.6-sol"),
@@ -92,12 +91,11 @@ def schedule_grounded_synthesis_if_ready(
             maximum=80,
         )
         key_present = _secret_present(getattr(settings, "openai_api_key", None))
-        missing_key_code = "openai_api_key_missing"
     enabled = bool(getattr(settings, "grounded_synthesis_enabled", True))
     skip_code = (
         "grounded_synthesis_disabled"
         if not enabled
-        else missing_key_code
+        else "api_key_missing"
         if not key_present
         else None
     )

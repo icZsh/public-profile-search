@@ -986,26 +986,26 @@ def validate_grounded_synthesis(
                 for error in exc.errors(include_input=False)[:12]
             ],
         )
-        raise GroundingValidationError("openai_output_schema_invalid") from exc
+        raise GroundingValidationError("output_schema_invalid") from exc
 
     if require_rich_v2 and output.schema_version not in {
         OUTPUT_SCHEMA_VERSION_V2,
         OUTPUT_SCHEMA_VERSION_V3,
         OUTPUT_SCHEMA_VERSION_V4,
     }:
-        raise GroundingValidationError("openai_output_schema_version_invalid")
+        raise GroundingValidationError("output_schema_version_invalid")
     if require_template_v3 and output.schema_version != OUTPUT_SCHEMA_VERSION_V3:
-        raise GroundingValidationError("openai_output_schema_version_invalid")
+        raise GroundingValidationError("output_schema_version_invalid")
     if require_template_v4 and output.schema_version != OUTPUT_SCHEMA_VERSION_V4:
-        raise GroundingValidationError("openai_output_schema_version_invalid")
+        raise GroundingValidationError("output_schema_version_invalid")
     if (
         require_rich_v2 or require_template_v3 or require_template_v4
     ) and not _rich_fields_are_explicit(output):
-        raise GroundingValidationError("openai_output_schema_invalid")
+        raise GroundingValidationError("output_schema_invalid")
     known_source_ids = {source.source_id for source in packet.sources}
     referenced_source_ids = _referenced_source_ids(output)
     if not referenced_source_ids.issubset(known_source_ids):
-        raise GroundingValidationError("openai_output_unknown_source_id")
+        raise GroundingValidationError("output_unknown_source_id")
     known_identifiers = {
         packet.seed.identifier,
         *(source.source_id for source in packet.sources),
@@ -1016,12 +1016,12 @@ def validate_grounded_synthesis(
         _output_narrative_values(output),
         exempt_literals=known_identifiers,
     ):
-        raise GroundingValidationError("openai_output_contains_contact_data")
+        raise GroundingValidationError("output_contains_contact_data")
 
     allowed_urls = _urls_in_value(packet.model_dump(mode="json"))
     output_urls = _urls_in_value(output.model_dump(mode="json"))
     if not output_urls.issubset(allowed_urls):
-        raise GroundingValidationError("openai_output_unknown_url")
+        raise GroundingValidationError("output_unknown_url")
     _validate_output_accounts(output, packet=packet)
     return output
 
@@ -1164,14 +1164,14 @@ def request_grounded_synthesis(
     if not packet.sources:
         return _fallback(
             status="no_result",
-            error_code=_provider_error_code(safe_provider, "synthesis_no_evidence"),
+            error_code="synthesis_no_evidence",
             input_checksum=input_checksum,
             model=safe_model,
         )
     if not isinstance(api_key, str) or not api_key.strip():
         return _fallback(
             status="skipped_configuration",
-            error_code=_provider_error_code(safe_provider, "api_key_missing"),
+            error_code="api_key_missing",
             input_checksum=input_checksum,
             model=safe_model,
         )
@@ -1220,21 +1220,21 @@ def request_grounded_synthesis(
     except _SynthesisRequestCancelled:
         return _fallback(
             status="provider_error",
-            error_code=_provider_error_code(safe_provider, "request_cancelled"),
+            error_code="request_cancelled",
             input_checksum=input_checksum,
             model=safe_model,
         )
     except httpx.TimeoutException:
         return _fallback(
             status="timeout",
-            error_code=_provider_error_code(safe_provider, "request_timeout"),
+            error_code="request_timeout",
             input_checksum=input_checksum,
             model=safe_model,
         )
     except httpx.HTTPError:
         return _fallback(
             status="provider_error",
-            error_code=_provider_error_code(safe_provider, "network_error"),
+            error_code="network_error",
             input_checksum=input_checksum,
             model=safe_model,
         )
@@ -1250,7 +1250,7 @@ def request_grounded_synthesis(
                 status, error_code = typed_failure
         return _fallback(
             status=status,
-            error_code=error_code or _provider_error_code(safe_provider, "unexpected_status"),
+            error_code=error_code or "unexpected_status",
             input_checksum=input_checksum,
             model=safe_model,
         )
@@ -1258,10 +1258,7 @@ def request_grounded_synthesis(
     if content_type != "application/json" or len(response.content) > _MAX_RESPONSE_BYTES:
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(
-                safe_provider,
-                "response_invalid_envelope",
-            ),
+            error_code="response_invalid_envelope",
             input_checksum=input_checksum,
             model=safe_model,
         )
@@ -1270,7 +1267,7 @@ def request_grounded_synthesis(
     except ValueError:
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(safe_provider, "response_invalid_json"),
+            error_code="response_invalid_json",
             input_checksum=input_checksum,
             model=safe_model,
         )
@@ -1452,7 +1449,7 @@ def _parse_response(
     if not isinstance(payload, dict):
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(provider, "response_invalid_payload"),
+            error_code="response_invalid_payload",
             input_checksum=input_checksum,
             model=request_model,
         )
@@ -1477,10 +1474,7 @@ def _parse_response(
         reason_code = _safe_error_suffix(reason)
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(
-                provider,
-                f"incomplete_{reason_code}",
-            ),
+            error_code=f"incomplete_{reason_code}",
             input_checksum=input_checksum,
             model=request_model,
             response_id=response_id,
@@ -1492,7 +1486,7 @@ def _parse_response(
         )
         return _fallback(
             status="provider_error" if payload.get("error") is not None else "invalid_response",
-            error_code=_provider_error_code(provider, error_suffix),
+            error_code=error_suffix,
             input_checksum=input_checksum,
             model=request_model,
             response_id=response_id,
@@ -1503,7 +1497,7 @@ def _parse_response(
     if not isinstance(output, list):
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(provider, "response_output_missing"),
+            error_code="response_output_missing",
             input_checksum=input_checksum,
             model=request_model,
             response_id=response_id,
@@ -1522,7 +1516,7 @@ def _parse_response(
             if content_item.get("type") == "refusal":
                 return _fallback(
                     status="invalid_response",
-                    error_code=_provider_error_code(provider, "response_refusal"),
+                    error_code="response_refusal",
                     input_checksum=input_checksum,
                     model=request_model,
                     response_id=response_id,
@@ -1535,7 +1529,7 @@ def _parse_response(
     if not text_parts:
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(provider, "response_text_missing"),
+            error_code="response_text_missing",
             input_checksum=input_checksum,
             model=request_model,
             response_id=response_id,
@@ -1546,7 +1540,7 @@ def _parse_response(
     except (TypeError, ValueError):
         return _fallback(
             status="invalid_response",
-            error_code=_provider_error_code(provider, "output_invalid_json"),
+            error_code="output_invalid_json",
             input_checksum=input_checksum,
             model=request_model,
             response_id=response_id,
@@ -1561,7 +1555,7 @@ def _parse_response(
     except GroundingValidationError as exc:
         return _fallback(
             status="invalid_response",
-            error_code=_provider_validation_error(exc.code, provider=provider),
+            error_code=exc.code,
             input_checksum=input_checksum,
             model=request_model,
             response_id=response_id,
@@ -1638,16 +1632,16 @@ def _http_failure(
     if status_code == 200:
         return None, None
     if status_code in {401, 403}:
-        return "auth_required", _provider_error_code(provider, "auth_required")
+        return "auth_required", "auth_required"
     if status_code == 402 and provider == "openrouter":
-        return "auth_required", "openrouter_payment_required"
+        return "auth_required", "payment_required"
     if status_code == 429:
-        return "rate_limited", _provider_error_code(provider, "rate_limited")
+        return "rate_limited", "rate_limited"
     if status_code in {408, 504}:
-        return "timeout", _provider_error_code(provider, "request_timeout")
+        return "timeout", "request_timeout"
     if status_code >= 500:
-        return "provider_error", _provider_error_code(provider, "unavailable")
-    return "invalid_response", _provider_error_code(provider, "unexpected_status")
+        return "provider_error", "unavailable"
+    return "invalid_response", "unexpected_status"
 
 
 def _fallback(
@@ -1980,21 +1974,21 @@ def _validate_output_accounts(
     for assessment in output.account_assessments:
         account = accounts_by_id.get(assessment.account_id)
         if account is None:
-            raise GroundingValidationError("openai_output_unknown_account_id")
+            raise GroundingValidationError("output_unknown_account_id")
         if (
             assessment.canonical_url != account.canonical_url
             or assessment.canonical_handle.casefold() != account.canonical_handle.casefold()
             or assessment.platform.casefold() != account.platform.casefold()
         ):
-            raise GroundingValidationError("openai_output_account_mismatch")
+            raise GroundingValidationError("output_account_mismatch")
     for candidate in output.excluded_candidates:
         if candidate.account_id is None:
             continue
         account = accounts_by_id.get(candidate.account_id)
         if account is None:
-            raise GroundingValidationError("openai_output_unknown_account_id")
+            raise GroundingValidationError("output_unknown_account_id")
         if candidate.canonical_url is not None and candidate.canonical_url != account.canonical_url:
-            raise GroundingValidationError("openai_output_account_mismatch")
+            raise GroundingValidationError("output_account_mismatch")
 
 
 def _contains_contact_data(
@@ -2199,20 +2193,6 @@ def _safe_error_suffix(value: object) -> str:
     return candidate or "unknown"
 
 
-def _provider_error_code(provider: SynthesisProvider, suffix: str) -> str:
-    return f"{provider}_{suffix}"
-
-
-def _provider_validation_error(
-    code: str,
-    *,
-    provider: SynthesisProvider,
-) -> str:
-    if provider == "openrouter" and code.startswith("openai_"):
-        return f"openrouter_{code.removeprefix('openai_')}"
-    return code
-
-
 def _openrouter_http_payload_failure(
     response: httpx.Response,
 ) -> tuple[SynthesisStatus, str] | None:
@@ -2251,7 +2231,7 @@ def _openrouter_error_type_failure(
         status = "provider_error"
     else:
         status = "invalid_response"
-    return status, f"openrouter_{error_type}"
+    return status, error_type
 
 
 def _bounded_int(value: object, *, minimum: int, maximum: int, field: str) -> int:
