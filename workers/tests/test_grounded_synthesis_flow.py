@@ -39,6 +39,7 @@ from workers.maintenance.outbox_dispatcher import CeleryPublisher, dispatch_once
 from workers.maintenance.reconciler import reclaim_expired_leases
 from workers.orchestrator.celery_app import celery_app
 from workers.providers.grounded_synthesis import (
+    EvidenceSeedInput,
     GroundedSynthesisOutcome,
     GroundedSynthesisOutput,
     SynthesisUsage,
@@ -548,6 +549,70 @@ def test_synthesis_stops_retrying_truncation_once_at_the_ceiling(monkeypatch):
         result = session.get(GroundedSynthesisResult, run_id)
         assert result is not None
         assert result.error_code == "incomplete_max_output_tokens"
+
+
+def test_synthesis_preflight_cancellation_uses_gateway_agnostic_error_code():
+    cancel_event = Event()
+    cancel_event.set()
+    runner_called = False
+
+    def runner(**_kwargs):
+        nonlocal runner_called
+        runner_called = True
+        raise AssertionError("A cancelled synthesis must not call the provider")
+
+    outcome = synthesis_runs_service._execute_synthesis(
+        runner=runner,
+        settings=_settings(openrouter_api_key="test-openrouter-key"),
+        lease=synthesis_runs_service._SynthesisLease(
+            generation=1,
+            acceptance_epoch=1,
+            job_id="cancelled-job",
+            query_config={
+                "gateway": "openrouter",
+                "model": "~deepseek/deepseek-v4-flash-latest",
+            },
+            seed=EvidenceSeedInput(
+                platform="github",
+                identifier_type="handle",
+                identifier="alice",
+            ),
+            sources=(),
+            accounts=(),
+            timeout_seconds=None,
+            lease_seconds=120,
+        ),
+        cancel_event=cancel_event,
+        transport=None,
+    )
+
+    assert not runner_called
+    assert outcome.status == "provider_error"
+    assert outcome.error_code == "request_cancelled"
+
+
+def test_combined_usage_marks_mixed_optional_token_details_unknown():
+    detailed = SynthesisUsage(
+        input_tokens=100,
+        output_tokens=50,
+        total_tokens=150,
+        reasoning_tokens=30,
+        cached_input_tokens=80,
+    )
+    summary_only = SynthesisUsage(
+        input_tokens=120,
+        output_tokens=60,
+        total_tokens=180,
+    )
+
+    for first, second in ((detailed, summary_only), (summary_only, detailed)):
+        combined = synthesis_runs_service._combined_usage(first, second)
+        assert combined is not None
+        assert combined.input_tokens == 220
+        assert combined.output_tokens == 110
+        assert combined.total_tokens == 330
+        assert combined.reasoning_tokens is None
+        assert combined.cached_input_tokens is None
 
 
 def test_synthesis_retries_transient_openrouter_failure_and_aggregates_usage(

@@ -647,7 +647,7 @@ def _execute_synthesis(
         if cancel_event is not None and cancel_event.is_set():
             return _fallback_outcome(
                 status="provider_error",
-                error_code=f"{gateway}_request_cancelled",
+                error_code="request_cancelled",
                 model=model,
                 job_id=lease.job_id,
             )
@@ -739,10 +739,8 @@ def _combined_usage(
 
 
 def _combined_optional(total: int | None, current: int | None) -> int | None:
-    if total is None:
-        return current
-    if current is None:
-        return total
+    if total is None or current is None:
+        return None
     return total + current
 
 
@@ -797,7 +795,7 @@ def _upsert_result(
     prompt_version: str,
     input_checksum: str,
     output: dict[str, object] | None,
-    usage: dict[str, int] | None,
+    usage: dict[str, object] | None,
     error_code: str | None,
     created_at,
 ) -> None:
