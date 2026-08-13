@@ -14,3 +14,9 @@ coverage/
 .coverage
 .wrangler/
 prototype.db
+
+# Keep local planning and visual QA artifacts out of the repository root.
+/*.md
+/*.png
+!/README.md
+!/THIRD_PARTY_NOTICES.md
