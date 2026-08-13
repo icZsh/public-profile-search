@@ -3,48 +3,62 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <main className="shell">
-      <nav className="topbar" aria-label="Primary navigation">
-        <Link className="brand" href="/">
+    <main className="traceApp traceHome">
+      <nav className="traceTopbar" aria-label="Primary navigation">
+        <Link className="traceBrand" href="/">
           tracebrief<span className="brandMark">/</span>
         </Link>
-        <span className="prototypePill">Local discovery prototype</span>
+        <details className="traceOperatorDisclosure">
+          <summary>Operator view</summary>
+          <div>
+            <strong>Public-source discovery</strong>
+            <span>Quick checks 20 sites. Deep expands to 56 and adds a cited narrative.</span>
+          </div>
+        </details>
       </nav>
 
-      <section className="hero">
-        <div className="eyebrow">One identifier, many possible accounts</div>
+      <section className="traceSearchIntro">
+        <div className="traceKicker">One identifier, one brief</div>
         <h1>
-          Map a person&apos;s public
+          What does the public
           <br />
-          <span>digital footprint.</span>
+          record say about
+          <br />
+          this handle?
         </h1>
-        <p className="heroCopy">
-          Paste a handle or public profile URL. Tracebrief infers platform context
-          when it can, searches for public account candidates, and keeps uncertain
-          matches visibly unresolved.
+        <p className="traceSearchLead">
+          Enter a handle or public profile URL. Every answer arrives with the source
+          it came from and the reason it stops where it does.
         </p>
         <FootprintSearchForm />
-      </section>
 
-      <section className="principles" aria-label="Discovery principles">
-        <article>
-          <span>01</span>
-          <h2>Start anywhere</h2>
-          <p>
-            Profile URLs carry their platform context; bare handles search across
-            the catalog.
-          </p>
-        </article>
-        <article>
-          <span>02</span>
-          <h2>Watch it unfold</h2>
-          <p>Candidate profiles and coverage appear progressively as sites respond.</p>
-        </article>
-        <article>
-          <span>03</span>
-          <h2>Evidence, not certainty</h2>
-          <p>Every lead keeps its discovery evidence without implying shared identity.</p>
-        </article>
+        <section
+          className="tracePrinciples"
+          id="methodology"
+          aria-label="Discovery principles"
+        >
+          <article>
+            <h2>Candidates, not claims</h2>
+            <p>
+              Tracebrief infers platform context from public profile URLs. A shared
+              handle is a lead, never proof of one person.
+            </p>
+          </article>
+          <article>
+            <h2>Every answer cited</h2>
+            <p>
+              Candidate profiles and coverage appear progressively. Each final answer
+              keeps the source that produced it.
+            </p>
+          </article>
+          <article>
+            <h2>Limits stated</h2>
+            <p>
+              The brief says what would change its conclusion and what it must not be
+              used for.
+            </p>
+          </article>
+        </section>
       </section>
     </main>
   );

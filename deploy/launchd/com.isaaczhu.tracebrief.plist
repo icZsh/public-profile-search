@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.isaaczhu.tracebrief</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/isaaczhu/public-profile-search/scripts/start-tracebrief.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/isaaczhu/public-profile-search</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/isaaczhu</string>
+    <key>USER</key>
+    <string>isaaczhu</string>
+    <key>LOGNAME</key>
+    <string>isaaczhu</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>AbandonProcessGroup</key>
+  <false/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>ExitTimeOut</key>
+  <integer>35</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/isaaczhu/Library/Logs/Tracebrief/tracebrief.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/isaaczhu/Library/Logs/Tracebrief/tracebrief.err.log</string>
+</dict>
+</plist>

@@ -1,0 +1,2137 @@
+.traceApp {
+  min-height: 100vh;
+  background: #e8e5da;
+  color: #17201c;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+.traceApp button,
+.traceApp input,
+.traceApp select,
+.traceApp summary {
+  border-radius: 0;
+}
+
+.traceSrOnly,
+.traceModePicker > legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.traceTopbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 24px;
+  border-bottom: 1px solid #d8d8cf;
+  background: rgb(255 253 248 / 72%);
+}
+
+.traceBrand {
+  flex: 0 0 auto;
+  color: #17201c;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+
+.traceBrand:hover {
+  color: #17201c;
+}
+
+.traceTopbarIdentity,
+.traceTopbarActions {
+  display: flex;
+  align-items: center;
+}
+
+.traceTopbarIdentity {
+  min-width: 0;
+  gap: 20px;
+}
+
+.traceTopbarIdentity > span {
+  overflow: hidden;
+  color: #647168;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traceTopbarActions {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.traceOperatorDisclosure {
+  position: relative;
+}
+
+.traceOperatorDisclosure summary,
+.traceSecondaryButton,
+.traceTopbarPrimary,
+.traceTopbar .stopSearchButton {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d8d8cf;
+  padding: 0 12px;
+  background: transparent;
+  color: #3d4a41;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: 0;
+  list-style: none;
+}
+
+.traceOperatorDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.traceOperatorDisclosure summary:hover,
+.traceOperatorDisclosure[open] summary,
+.traceSecondaryButton:hover {
+  border-color: #17201c;
+  color: #17201c;
+}
+
+.traceOperatorDisclosure > div {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  width: min(320px, calc(100vw - 32px));
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid #17201c;
+  background: #fffdf8;
+  box-shadow: 0 14px 34px rgb(23 32 28 / 12%);
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.traceOperatorDisclosure > div strong {
+  color: #17201c;
+}
+
+.tracePrimaryButton {
+  border: 1px solid #17201c;
+  background: #d7ff53;
+  color: #17201c;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.tracePrimaryButton:hover:not(:disabled) {
+  background: #c9f13e;
+}
+
+.tracePrimaryButton:disabled,
+.traceSecondaryButton[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.traceTopbarPrimary {
+  border-color: #17201c;
+  background: #d7ff53;
+  color: #17201c;
+  font-weight: 700;
+}
+
+.traceKicker,
+.traceSidebarHeading,
+.traceFoundHeading > strong,
+.traceCheckpointStatus strong,
+.traceRunningStatus {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Search entry */
+
+.traceSearchIntro {
+  width: min(820px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 76px 0 80px;
+}
+
+.traceSearchIntro h1 {
+  margin: 16px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(48px, 6vw, 68px);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.traceSearchLead {
+  max-width: 660px;
+  margin: 22px 0 0;
+  color: #3d4a41;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.traceSearchCard {
+  margin-top: 40px;
+  border: 1px solid #17201c;
+  background: #fffdf8;
+}
+
+.traceSearchInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.traceSearchInputRow input {
+  min-width: 0;
+  height: 68px;
+  border: 0;
+  border-right: 1px solid #17201c;
+  padding: 0 22px;
+  background: transparent;
+  color: #17201c;
+  font-size: 18px;
+  outline: none;
+}
+
+.traceSearchInputRow input::placeholder {
+  color: #747a75;
+  opacity: 1;
+}
+
+.traceSearchInputRow input:focus-visible {
+  box-shadow: inset 0 0 0 3px rgb(142 175 36 / 42%);
+}
+
+.traceSearchInputRow .tracePrimaryButton {
+  min-width: 164px;
+  height: 68px;
+  border: 0;
+  padding: 0 28px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.traceModePicker {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.traceModeOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border-top: 1px solid #17201c;
+  background: #d8d8cf;
+}
+
+.traceModeOption {
+  position: relative;
+  display: block;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.traceModeOption input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.traceModeOptionBody {
+  display: block;
+  min-height: 178px;
+  padding: 20px 22px;
+  background: #f6f5ee;
+}
+
+.traceModeOptionSelected .traceModeOptionBody {
+  background: #fffdf8;
+  box-shadow: inset 0 3px 0 #d7ff53;
+}
+
+.traceModeOption input:focus-visible + .traceModeOptionBody {
+  outline: 3px solid #8eaf24;
+  outline-offset: -4px;
+}
+
+.traceModeOptionHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.traceModeOptionHeading strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.traceModeOptionHeading > small {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceSelectedBadge {
+  display: inline-block;
+  margin-left: 8px;
+  border: 1px solid #17201c;
+  padding: 3px 7px;
+  background: #d7ff53;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.traceModeOptionDescription {
+  display: block;
+  margin-top: 8px;
+  color: #3d4a41;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.traceModeFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.traceModeFeature {
+  border: 1px solid #d8d8cf;
+  padding: 4px 7px;
+  color: #647168;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.traceModeFeatureAccent {
+  border-color: #8eaf24;
+  background: rgb(215 255 83 / 22%);
+  color: #17201c;
+}
+
+.traceModeFeatureUnavailable {
+  border-style: dashed;
+  color: #909890;
+}
+
+.traceModelPicker {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 18px;
+  align-items: center;
+  border-top: 1px solid #17201c;
+  padding: 12px 22px 14px;
+  background: #f6f5ee;
+}
+
+.traceModelPickerLabel {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.traceModelPickerLabel strong {
+  color: #17201c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.traceModelPickerLabel span {
+  color: #647168;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.traceModelControl {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.traceModelControl select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #a7aaa3;
+  padding: 0 34px 0 10px;
+  background: #fffdf8;
+  color: #17201c;
+  cursor: pointer;
+  font: 700 11px/1.3 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.traceModelControl select:focus-visible {
+  outline: 3px solid #8eaf24;
+  outline-offset: 2px;
+}
+
+.traceModelControl select:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.traceModelSummary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 3px 10px;
+  margin: 0;
+  color: #647168;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.traceModelSummary span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.traceModelSummary strong {
+  color: #3d4a41;
+}
+
+.traceModelSummary small {
+  font-size: inherit;
+}
+
+.traceFormError {
+  margin: 0;
+  border-top: 1px solid #a64231;
+  padding: 12px 18px;
+  background: #fbf3ef;
+  color: #a64231;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tracePrinciples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  margin-top: 40px;
+  border-top: 1px solid #d8d8cf;
+  padding-top: 22px;
+}
+
+.tracePrinciples h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tracePrinciples p {
+  margin: 3px 0 0;
+  color: #647168;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Running discovery */
+
+.traceRunningPage {
+  padding: 44px 36px 60px;
+}
+
+.traceRunningGrid {
+  display: grid;
+  width: min(1108px, 100%);
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) 368px;
+  gap: 36px;
+  align-items: start;
+}
+
+.traceRunningHeader {
+  padding-bottom: 22px;
+  border-bottom: 3px double #17201c;
+}
+
+.traceRunningStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #8eaf24;
+}
+
+.traceRunningStatus .scanPulse {
+  width: 10px;
+  height: 10px;
+  margin: 0;
+}
+
+.traceRunningHeader h1 {
+  max-width: 620px;
+  margin: 14px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(40px, 4.2vw, 52px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+.traceRunningIntro {
+  display: grid;
+  margin-top: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+}
+
+.traceRunningIntro p {
+  margin: 0;
+  color: #3d4a41;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.traceTimer {
+  display: grid;
+  min-width: 128px;
+  justify-items: end;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.traceTimer strong {
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.traceTimer span {
+  color: #647168;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.traceProgressList.deepProgressSteps {
+  display: grid;
+  margin: 24px 0 0;
+  border: 0;
+  padding: 0;
+  grid-template-columns: 1fr;
+  gap: 0;
+  background: transparent;
+}
+
+.traceProgressStep {
+  position: relative;
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 14px;
+  align-items: center;
+  border-left: 3px solid transparent;
+  padding: 14px 14px 14px 12px;
+  background: transparent;
+  list-style: none;
+}
+
+.traceProgressStep.deepProgressStep-running {
+  border-left-color: #d7ff53;
+  background: rgb(215 255 83 / 10%);
+}
+
+.traceProgressStep.deepProgressStep-pending {
+  color: #9aa39b;
+}
+
+.traceStepStatusRing {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 0 #17201c;
+  transition:
+    background-color 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.traceStepProgressRing {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: 1;
+  transform: rotate(-90deg);
+  transition: opacity 180ms ease-out;
+}
+
+.traceStepProgressRingTrack,
+.traceStepProgressRingValue {
+  fill: none;
+  stroke-width: 2;
+}
+
+.traceStepProgressRingTrack {
+  stroke: #9aa39b;
+}
+
+.traceStepProgressRingValue {
+  stroke: #17201c;
+  stroke-dasharray: 100;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 720ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.traceStepProgressRingIndeterminate {
+  stroke-dasharray: 24 76;
+  transform-origin: center;
+  animation: trace-step-progress-spin 950ms linear infinite;
+}
+
+@keyframes trace-step-progress-spin {
+  to { transform: rotate(360deg); }
+}
+
+.traceStepStatusRing-complete {
+  background: #8eaf24;
+  box-shadow: none;
+}
+
+.traceStepStatusRing-complete .traceStepProgressRing {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.traceStepCompleteCheck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #fff;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+  transform: translate(-50%, -50%);
+}
+
+.traceStepStatusRing-stopped .traceStepProgressRingTrack {
+  stroke: #a64231;
+}
+
+.traceProgressStep > div {
+  display: grid;
+  gap: 2px;
+}
+
+.traceProgressStep > div strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.traceProgressStep > div small {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceLiveSidebar {
+  position: sticky;
+  top: 20px;
+  border: 1px solid #d8d8cf;
+  padding: 22px;
+  background: #fffdf8;
+}
+
+.traceSidebarHeading {
+  color: #647168;
+}
+
+.traceSidebarCount {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.traceSidebarCount strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 500;
+}
+
+.traceSidebarCount span {
+  color: #647168;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+}
+
+.traceLiveSources {
+  margin-top: 10px;
+  border: 1px solid #e0ded4;
+}
+
+.traceLiveSources > div {
+  display: grid;
+  min-height: 36px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid #e0ded4;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.traceLiveSources > div:last-child {
+  border-bottom: 0;
+}
+
+.traceLiveSources > div > span {
+  color: #8eaf24;
+  font-weight: 800;
+}
+
+.traceLiveSources > div > small {
+  color: #647168;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.traceLiveSources > p,
+.traceCoveragePanel > p {
+  margin: 0;
+  padding: 13px;
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.traceCoveragePanel {
+  margin-top: 20px;
+  border-top: 1px solid #d8d8cf;
+  padding-top: 20px;
+}
+
+.traceCoverageTrack {
+  height: 3px;
+  margin-top: 12px;
+  overflow: hidden;
+  background: #e0ded4;
+}
+
+.traceCoverageTrack > span {
+  display: block;
+  height: 100%;
+  background: #8eaf24;
+  transition: width 240ms ease;
+}
+
+.traceCoveragePanel dl {
+  display: grid;
+  margin: 16px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 26px;
+}
+
+.traceCoveragePanel dl div {
+  display: grid;
+}
+
+.traceCoveragePanel dd,
+.traceCoveragePanel dt {
+  margin: 0;
+}
+
+.traceCoveragePanel dd {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+}
+
+.traceCoveragePanel dt {
+  color: #647168;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.traceCoveragePanel > p {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+/* Progressive candidates */
+
+.traceFound {
+  margin-top: 34px;
+}
+
+.traceFoundHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #17201c;
+  padding-bottom: 9px;
+}
+
+.traceFoundHeading > strong {
+  color: #8eaf24;
+}
+
+.traceFoundHeading > span {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceFoundRow {
+  display: grid;
+  min-height: 64px;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  border-bottom: 1px solid #e0ded4;
+  padding: 10px 0;
+}
+
+.traceFoundIdentity,
+.traceFoundDescription {
+  display: grid;
+}
+
+.traceFoundIdentity strong,
+.traceFoundDescription strong {
+  font-size: 12px;
+}
+
+.traceFoundIdentity span,
+.traceFoundDescription span {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceFoundRowWeak {
+  color: #909890;
+}
+
+.traceFoundLink {
+  color: #647168;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.traceFoundLink:hover {
+  color: #8eaf24;
+}
+
+.traceFoundLinkUnavailable {
+  opacity: 0.7;
+}
+
+.traceRunningMain .candidateEmpty {
+  margin-top: 30px;
+  border: 1px dashed #c4c1b5;
+  padding: 20px;
+  background: transparent;
+}
+
+/* Identity checkpoint */
+
+.traceCheckpointPage {
+  padding: 48px 36px 64px;
+}
+
+.traceCheckpoint {
+  width: min(900px, 100%);
+  margin: 0 auto;
+}
+
+.traceCheckpointStatus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.traceCheckpointStatus strong {
+  border: 1px solid #17201c;
+  padding: 5px 10px;
+  background: #d7ff53;
+}
+
+.traceCheckpointStatus span {
+  color: #647168;
+  font-size: 12px;
+}
+
+.traceCheckpoint .anchorCheckpoint {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.traceCheckpoint .anchorCheckpoint .eyebrow {
+  display: none;
+}
+
+.traceCheckpoint .anchorCheckpoint h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(40px, 4vw, 46px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.traceCheckpoint .anchorCheckpoint > p {
+  max-width: 720px;
+  margin: 16px 0 0;
+  color: #3d4a41;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.traceCheckpointGrid {
+  display: grid;
+  margin-top: 32px;
+  border: 1px solid #17201c;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #17201c;
+}
+
+.traceCheckpointChoice {
+  display: flex;
+  min-width: 0;
+  min-height: 260px;
+  flex-direction: column;
+  padding: 24px;
+  background: #fffdf8;
+}
+
+.traceCheckpointChoice:nth-child(even) {
+  background: #f6f5ee;
+}
+
+.traceCheckpointChoiceMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.traceCheckpointChoiceMeta strong {
+  color: #8eaf24;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.traceCheckpointChoiceMeta span {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceCheckpointChoice h2 {
+  margin: 12px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.traceEvidenceSignals {
+  display: grid;
+  gap: 7px;
+  margin: 16px 0 22px;
+  padding: 0;
+  color: #3d4a41;
+  font-size: 12px;
+  line-height: 1.5;
+  list-style: none;
+}
+
+.traceEvidenceSignals li {
+  position: relative;
+  padding-left: 18px;
+}
+
+.traceEvidenceSignals li::before {
+  position: absolute;
+  left: 0;
+  color: #8eaf24;
+  content: "+";
+  font-weight: 800;
+}
+
+.traceEvidenceSignals li[data-signal="limit"]::before {
+  color: #a64231;
+  content: "−";
+}
+
+.traceCheckpointChoice .candidateAnchorButton {
+  width: 100%;
+  min-height: 42px;
+  margin-top: auto;
+  border: 1px solid #17201c;
+  padding: 0 16px;
+  background: #d7ff53;
+  color: #17201c;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.traceCheckpointChoice:nth-child(even) .candidateAnchorButton {
+  background: transparent;
+}
+
+.traceCheckpointChoice .candidateAnchorButton:hover:not(:disabled) {
+  background: #c9f13e;
+}
+
+.traceCheckpointChoice .candidateAnchorButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.traceCheckpointFallback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 18px;
+  border: 1px dashed #c4c1b5;
+  padding: 16px 18px;
+  color: #3d4a41;
+  font-size: 12px;
+}
+
+.traceCheckpointFallback p {
+  margin: 0;
+  color: #647168;
+}
+
+.traceInlineError,
+.traceInlineNotice {
+  position: relative;
+  z-index: 5;
+  width: min(1108px, calc(100% - 48px));
+  margin: 18px auto 0;
+  border: 1px solid #a64231;
+  padding: 12px 16px;
+  background: #fbf3ef;
+  color: #a64231;
+  font-size: 12px;
+}
+
+.traceInlineNotice {
+  border-color: #8eaf24;
+  background: rgb(215 255 83 / 12%);
+  color: #3d4a41;
+}
+
+.traceJobFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: min(1108px, calc(100% - 48px));
+  margin: 0 auto;
+  border-top: 1px solid #d8d8cf;
+  padding: 28px 0 42px;
+}
+
+.traceJobFooter > div {
+  display: grid;
+  gap: 4px;
+}
+
+.traceJobFooter > div strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.traceJobFooter > div span {
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.traceJobFooter .tracePrimaryButton {
+  display: inline-flex;
+  min-height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  color: #17201c;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+/* Quick and Deep briefs */
+
+.traceBriefRoot {
+  background: #e8e5da;
+}
+
+.traceBriefLayout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.traceBriefDocumentWrap {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 660px;
+  justify-content: center;
+  padding: clamp(20px, 3vw, 40px) clamp(16px, 3vw, 36px) 72px;
+}
+
+.traceBriefPaper {
+  width: 100%;
+  max-width: 820px;
+  border: 1px solid #d8d8cf;
+  padding: clamp(28px, 4vw, 56px) clamp(24px, 4.5vw, 60px) 60px;
+  background: #fffdf8;
+  box-shadow: 0 14px 34px rgb(23 32 28 / 8%);
+}
+
+.traceBriefHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 30px;
+  border-bottom: 3px double #17201c;
+  padding-bottom: 18px;
+}
+
+.traceBriefTitleBlock {
+  min-width: 0;
+  flex: 1 1 300px;
+}
+
+.traceBriefEyebrow,
+.traceBriefSection h2,
+.traceBriefCompeting > h2,
+.traceSourceEyebrow,
+.traceSourceSubheading {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.traceBriefEyebrow,
+.traceSourceEyebrow,
+.traceSourceSubheading {
+  color: #647168;
+}
+
+.traceBriefHeader h1 {
+  margin: 14px 0 0;
+  overflow-wrap: anywhere;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 52px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.traceBriefSeed {
+  margin-top: 10px;
+  color: #647168;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-style: italic;
+}
+
+.traceBriefMetadata {
+  display: grid;
+  margin: 0;
+  grid-template-columns: auto auto;
+  gap: 4px 16px;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.traceBriefMetadata dt {
+  color: #647168;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.traceBriefMetadata dd {
+  margin: 0;
+}
+
+.traceBriefMetadata dd:first-of-type {
+  font-weight: 800;
+}
+
+.traceBriefLead {
+  display: grid;
+  margin-top: 34px;
+  grid-template-columns: minmax(0, 1fr) 196px;
+  gap: 36px;
+}
+
+.traceBriefLeadSummary > p {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 23px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.traceBriefConfidence {
+  border-left: 1px solid #d8d8cf;
+  padding-left: 22px;
+}
+
+.traceBriefConfidence > div {
+  color: #647168;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.traceBriefConfidence > strong {
+  display: block;
+  margin-top: 9px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 27px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.traceBriefConfidence > p {
+  margin: 10px 0 0;
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.traceBriefCompeting,
+.traceBriefSection {
+  margin-top: 38px;
+}
+
+.traceBriefCompeting > h2,
+.traceBriefSection h2 {
+  margin: 0;
+  color: #8eaf24;
+}
+
+.traceBriefCompetingGrid {
+  display: grid;
+  margin-top: 12px;
+  border: 1px solid #17201c;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #17201c;
+}
+
+.traceBriefSubjectCard {
+  min-width: 0;
+  padding: 20px 22px;
+  background: #fffdf8;
+}
+
+.traceBriefSubjectCardCompeting {
+  background: #f6f5ee;
+  color: #647168;
+}
+
+.traceBriefSubjectCardHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.traceBriefSubjectCardHeading span,
+.traceBriefSubjectCardHeading strong {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.traceBriefSubjectCardHeading span {
+  color: #8eaf24;
+}
+
+.traceBriefSubjectCardHeading strong {
+  border: 1px solid #17201c;
+  padding: 4px 8px;
+  background: #d7ff53;
+  color: #17201c;
+}
+
+.traceBriefSubjectCardCompeting .traceBriefSubjectCardHeading span {
+  color: #647168;
+}
+
+.traceBriefSubjectCardCompeting .traceBriefSubjectCardHeading strong {
+  border-color: #d8d8cf;
+  background: transparent;
+  color: #647168;
+}
+
+.traceBriefSubjectCard h3 {
+  margin: 11px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.traceBriefSubjectCard ul {
+  display: grid;
+  gap: 7px;
+  margin: 16px 0 0;
+  padding-left: 18px;
+  color: #3d4a41;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.traceBriefSubjectCard > p {
+  color: #3d4a41;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.traceBriefSubjectBoundary {
+  border-left: 2px solid #a64231;
+  padding-left: 10px;
+  color: #a64231 !important;
+}
+
+.traceBriefSection > h2,
+.traceBriefSectionHeading {
+  border-bottom: 1px solid #17201c;
+  padding-bottom: 7px;
+}
+
+.traceBriefSectionHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.traceBriefSectionHeading > span {
+  color: #647168;
+  font-size: 10px;
+}
+
+.traceBriefPersonRow {
+  display: grid;
+  min-height: 74px;
+  grid-template-columns: 124px minmax(0, 1fr) 104px;
+  gap: 24px;
+  align-items: start;
+  border-bottom: 1px solid #e6e3d9;
+  padding: 16px 0;
+}
+
+.traceBriefPersonLabel,
+.traceBriefConfidenceText {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceBriefPersonValue {
+  min-width: 0;
+}
+
+.traceBriefPersonValue > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.traceBriefPersonValue > p {
+  margin: 5px 0 0;
+  color: #647168;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.traceBriefConfidenceText {
+  text-align: right;
+  text-transform: capitalize;
+}
+
+.traceBriefPersonRowUnknown {
+  background: #f6f5ee;
+}
+
+.traceBriefEmpty {
+  margin: 0;
+  padding: 20px 0;
+  color: #647168;
+  font-size: 13px;
+}
+
+.traceReviewNotice {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 12px;
+  border-left: 2px solid #8eaf24;
+  padding: 8px 10px;
+  background: rgb(215 255 83 / 10%);
+  color: #647168;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.traceReviewNotice strong {
+  flex: 0 0 auto;
+  color: #17201c;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.traceBriefAccountRow {
+  display: grid;
+  min-height: 64px;
+  grid-template-columns: 126px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  border-bottom: 1px solid #e6e3d9;
+  padding: 10px 0;
+}
+
+.traceBriefAccountIdentity,
+.traceBriefAccountDetail {
+  display: grid;
+  min-width: 0;
+}
+
+.traceBriefAccountIdentity strong,
+.traceBriefAccountDetail > strong {
+  font-size: 11px;
+}
+
+.traceBriefAccountIdentity span,
+.traceBriefAccountDetail > p {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceBriefAccountDetail > p {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.traceBriefProfileLink {
+  width: max-content;
+  margin-top: 4px;
+  color: #8eaf24;
+  font-size: 10px;
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.traceReviewActions {
+  display: flex;
+  gap: 6px;
+}
+
+.traceReviewButton {
+  min-height: 30px;
+  border: 1px solid #17201c;
+  padding: 0 10px;
+  background: transparent;
+  color: #17201c;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.traceReviewButton:hover,
+.traceReviewButtonVerified {
+  background: #d7ff53;
+}
+
+.traceReviewButtonExclude {
+  border-color: #d8d8cf;
+  color: #647168;
+}
+
+.traceReviewExcluded {
+  color: #909890;
+  text-decoration-color: #909890;
+}
+
+.traceReviewExcluded .traceBriefAccountDetail > strong,
+.traceReviewExcluded .traceBriefAccountDetail > p,
+.traceReviewExcluded .traceBriefAccountIdentity strong {
+  text-decoration: line-through;
+}
+
+.traceBriefSetAside {
+  margin-top: 16px;
+  border: 1px dashed #c4c1b5;
+  padding: 14px 16px;
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceBriefSetAside > strong {
+  color: #17201c;
+  text-transform: uppercase;
+}
+
+.traceBriefSetAside ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.traceBriefConclusionBody > p {
+  margin: 16px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.traceBriefNextSteps,
+.traceBriefLimits,
+.traceBriefPolicy {
+  margin-top: 20px;
+  border-left: 2px solid #d8d8cf;
+  padding: 12px 14px;
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.traceBriefNextSteps > strong,
+.traceBriefLimits > strong,
+.traceBriefPolicy > strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #17201c;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.traceBriefNextSteps ol,
+.traceBriefLimits ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.traceBriefPolicy {
+  border-left-color: #a64231;
+  background: #fbf3ef;
+}
+
+.traceBriefPolicy > strong {
+  color: #a64231;
+}
+
+.traceQuickRoot .traceBriefDocumentWrap {
+  flex-basis: 700px;
+}
+
+.traceQuickRoot .traceBriefPaper {
+  max-width: 710px;
+}
+
+.traceQuickRoot .traceBriefHeader h1 {
+  font-size: 44px;
+}
+
+.traceQuickLimitRow {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  border-bottom: 1px solid #e6e3d9;
+}
+
+.traceQuickLimitRow span,
+.traceQuickLimitRow p {
+  color: #647168;
+  font-size: 11px;
+}
+
+.traceQuickLimitRow p {
+  margin: 0;
+}
+
+.traceQuickCta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 26px;
+  border: 1px solid #17201c;
+  padding: 14px 16px;
+  background: rgb(215 255 83 / 10%);
+}
+
+.traceQuickCta > div {
+  display: grid;
+  gap: 3px;
+}
+
+.traceQuickCta > div strong {
+  font-size: 12px;
+}
+
+.traceQuickCta > div span {
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.traceQuickModelChoice {
+  display: grid;
+  flex: 0 0 178px;
+  gap: 5px;
+}
+
+.traceQuickModelChoice > span {
+  color: #647168;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.traceQuickModelSelect {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #17201c;
+  padding: 0 30px 0 10px;
+  background: #fffdf8;
+  color: #17201c;
+  cursor: pointer;
+  font: 700 11px/1.3 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.traceQuickModelSelect:focus-visible {
+  outline: 3px solid #8eaf24;
+  outline-offset: 2px;
+}
+
+.traceQuickModelSelect:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.traceQuickCta button {
+  min-height: 40px;
+  flex: 0 0 auto;
+  border: 1px solid #17201c;
+  padding: 0 16px;
+  background: #d7ff53;
+  color: #17201c;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.traceQuickCta button:hover:not(:disabled) {
+  background: #c9f13e;
+}
+
+.traceQuickCta button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.traceSourceSidebar {
+  position: sticky;
+  top: 20px;
+  min-width: 300px;
+  max-width: 396px;
+  flex: 0 0 396px;
+  padding: clamp(20px, 3vw, 40px) clamp(16px, 3vw, 36px) 72px 0;
+}
+
+.traceSourcePanel {
+  border: 1px solid #d8d8cf;
+  padding: 22px;
+  background: #fffdf8;
+}
+
+.traceSourceFocus {
+  margin-top: 12px;
+  border: 1px solid #17201c;
+  padding: 14px;
+  background: #f6f5ee;
+}
+
+.traceSourceFocusHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.traceSourceFocusHeading strong {
+  font-size: 12px;
+}
+
+.traceSourceFocusHeading span {
+  flex: 0 0 auto;
+  border: 1px solid #17201c;
+  padding: 4px 7px;
+  background: #d7ff53;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.traceSourceProvenance {
+  margin-top: 10px;
+  color: #647168;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.traceSourceExcerpt {
+  margin: 12px 0 0;
+  border-left: 1px solid #d8d8cf;
+  padding-left: 12px;
+  color: #3d4a41;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.traceSourceOpenLink,
+.traceSourceUnavailable {
+  display: inline-block;
+  margin-top: 12px;
+  color: #17201c;
+  font-size: 10px;
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.traceSourceUnavailable {
+  color: #909890;
+}
+
+.traceSourceUses,
+.traceSourceIndex,
+.traceSourceCoverage {
+  margin-top: 20px;
+  border-top: 1px solid #d8d8cf;
+  padding-top: 18px;
+}
+
+.traceSourceUses ul {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #647168;
+  font-size: 10px;
+}
+
+.traceSourceIndexHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.traceSourceIndexHeading > span {
+  color: #647168;
+  font-size: 10px;
+}
+
+.traceSourceList {
+  margin: 10px 0 0;
+  border: 1px solid #e0ded4;
+  padding: 0;
+  list-style: none;
+}
+
+.traceSourceList li {
+  border-bottom: 1px solid #e0ded4;
+}
+
+.traceSourceList li:last-child {
+  border-bottom: 0;
+}
+
+.traceSourceRow {
+  display: grid;
+  width: 100%;
+  min-height: 36px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  padding: 0 10px;
+  background: transparent;
+  color: #17201c;
+  cursor: pointer;
+  text-align: left;
+}
+
+.traceSourceRow:hover,
+.traceSourceRowActive {
+  background: #d7ff53;
+}
+
+.traceSourceNumber {
+  color: #8eaf24;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.traceSourceTitle {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traceSourceClass {
+  color: #647168;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.traceSourceCoverage > p {
+  margin: 10px 0 0;
+  color: #647168;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.traceSourceCoverage dl {
+  display: grid;
+  margin: 12px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.traceSourceCoverage dt,
+.traceSourceCoverage dd {
+  margin: 0;
+}
+
+.traceSourceCoverage dt {
+  color: #647168;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.traceSourceCoverage dd {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+}
+
+.traceBriefPolicyCompact {
+  margin-top: 20px;
+}
+
+.traceSourceCitations {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 4px;
+  vertical-align: super;
+}
+
+.traceSourceCitation {
+  min-width: 14px;
+  min-height: 14px;
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  color: #8eaf24;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.traceSourceCitation:hover,
+.traceSourceCitationActive {
+  background: #d7ff53;
+  color: #17201c;
+}
+
+.traceSourceEmpty {
+  color: #647168;
+  font-size: 11px;
+}
+
+@media (max-width: 1000px) {
+  .traceRunningGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .traceLiveSidebar {
+    position: static;
+  }
+
+  .traceSourceSidebar {
+    position: static;
+    max-width: none;
+    flex-basis: 100%;
+    padding: 0 clamp(16px, 3vw, 36px) 72px;
+  }
+}
+
+@media (max-width: 720px) {
+  .traceTopbar {
+    min-height: 56px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .traceTopbarIdentity,
+  .traceTopbarActions {
+    width: 100%;
+  }
+
+  .traceTopbarIdentity {
+    justify-content: space-between;
+  }
+
+  .traceTopbarIdentity > span {
+    max-width: 62%;
+  }
+
+  .traceTopbarActions {
+    flex-wrap: wrap;
+  }
+
+  .traceTopbarActions .traceOperatorDisclosure {
+    margin-right: auto;
+  }
+
+  .traceOperatorDisclosure > div {
+    right: auto;
+    left: 0;
+  }
+
+  .traceSearchIntro {
+    width: min(100% - 32px, 820px);
+    padding: 48px 0 54px;
+  }
+
+  .traceSearchIntro h1 {
+    font-size: clamp(43px, 13vw, 58px);
+  }
+
+  .traceSearchInputRow,
+  .traceModeOptions,
+  .tracePrinciples,
+  .traceCheckpointGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .traceSearchInputRow input {
+    border-right: 0;
+    border-bottom: 1px solid #17201c;
+  }
+
+  .traceSearchInputRow .tracePrimaryButton {
+    width: 100%;
+  }
+
+  .traceModeOptionBody {
+    min-height: 0;
+  }
+
+  .traceModelPicker {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 12px 16px 14px;
+  }
+
+  .tracePrinciples {
+    gap: 20px;
+  }
+
+  .traceRunningPage,
+  .traceCheckpointPage {
+    padding: 34px 18px 48px;
+  }
+
+  .traceRunningIntro {
+    grid-template-columns: 1fr;
+  }
+
+  .traceTimer {
+    justify-items: start;
+  }
+
+  .traceFoundHeading,
+  .traceCheckpointFallback {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .traceFoundRow {
+    grid-template-columns: 1fr auto;
+  }
+
+  .traceFoundDescription {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .traceBriefDocumentWrap {
+    padding: 24px 14px 46px;
+  }
+
+  .traceBriefPaper {
+    padding: 30px 22px 42px;
+  }
+
+  .traceBriefMetadata {
+    width: 100%;
+    text-align: left;
+  }
+
+  .traceBriefLead,
+  .traceBriefCompetingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .traceBriefConfidence {
+    border-top: 1px solid #d8d8cf;
+    border-left: 0;
+    padding-top: 18px;
+    padding-left: 0;
+  }
+
+  .traceBriefPersonRow,
+  .traceBriefAccountRow {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .traceBriefConfidenceText {
+    text-align: left;
+  }
+
+  .traceReviewActions {
+    justify-content: flex-start;
+  }
+
+  .traceQuickCta,
+  .traceReviewNotice,
+  .traceJobFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .traceQuickCta button,
+  .traceQuickModelChoice,
+  .traceJobFooter .tracePrimaryButton {
+    width: 100%;
+  }
+
+  .traceSourceSidebar {
+    min-width: 0;
+    padding: 0 14px 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .traceStepStatusRing,
+  .traceStepProgressRing,
+  .traceStepProgressRingValue,
+  .traceCoverageTrack > span {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media print {
+  .traceTopbar,
+  .traceJobFooter,
+  .traceReviewNotice,
+  .traceReviewActions,
+  .traceInlineError,
+  .traceInlineNotice {
+    display: none !important;
+  }
+
+  .traceApp {
+    min-height: 0;
+    background: #fff;
+  }
+}

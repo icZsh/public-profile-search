@@ -972,6 +972,47 @@ a:focus-visible {
   white-space: nowrap;
 }
 
+.discoveryControls {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.stopSearchButton {
+  min-height: 44px;
+  border: 1px solid var(--danger);
+  padding: 10px 15px;
+  background: var(--surface);
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.stopSearchButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+}
+
+.stopSearchButton:focus-visible {
+  outline: 3px solid var(--danger);
+  outline-offset: 3px;
+}
+
+.stopSearchButton:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.stopSearchError {
+  margin: -22px 0 28px;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .discoveryStatus > span {
   display: grid;
   width: 19px;
@@ -2601,6 +2642,16 @@ a:focus-visible {
   .briefSectionHeading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .discoveryControls {
+    width: 100%;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .stopSearchButton {
+    flex: 1 1 auto;
   }
 
   .inputRow {

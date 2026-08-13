@@ -81,13 +81,18 @@ def search_exa_people(
     query: str,
     gateway: SafeFetchGateway,
     max_results: int = EXA_MAX_PEOPLE_RESULTS,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> ProfessionalSearchResult:
     if not _valid_limit(max_results, EXA_MAX_PEOPLE_RESULTS):
         return _failure(EXA_PROVIDER_ID, "invalid_response", "invalid_result_limit")
+    if _cancellation_requested(is_cancelled):
+        return _cancelled_result(EXA_PROVIDER_ID)
     try:
         response = gateway.search_exa_people(query, num_results=max_results)
     except SafeFetchError as exc:
         return _safe_fetch_failure(EXA_PROVIDER_ID, exc)
+    if _cancellation_requested(is_cancelled):
+        return _cancelled_result(EXA_PROVIDER_ID)
 
     failure = _response_failure(EXA_PROVIDER_ID, response)
     if failure is not None:
@@ -125,6 +130,7 @@ def search_exa_people_adaptive(
     stagnation_query_limit: int = 3,
     max_results_per_query: int = EXA_MAX_PEOPLE_RESULTS,
     monotonic: Callable[[], float] = time.monotonic,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> ProfessionalSearchResult:
     """Run deterministic query variants until evidence saturates or a budget is spent."""
 
@@ -150,6 +156,8 @@ def search_exa_people_adaptive(
     stagnant_queries = 0
     timed_out = False
     for query in queries[:request_budget]:
+        if _cancellation_requested(is_cancelled):
+            return _cancelled_result(EXA_PROVIDER_ID, profiles=tuple(profiles))
         if monotonic() - started_at >= time_budget_seconds:
             timed_out = True
             break
@@ -160,7 +168,10 @@ def search_exa_people_adaptive(
             query=query,
             gateway=gateway,
             max_results=max_results_per_query,
+            is_cancelled=is_cancelled,
         )
+        if result.status == "cancelled":
+            return _cancelled_result(EXA_PROVIDER_ID, profiles=tuple(profiles))
         novel_count = 0
         if result.status == "success":
             for profile in result.profiles:
@@ -212,6 +223,7 @@ def search_github_people(
     request_budget: int | None = None,
     time_budget_seconds: float | None = None,
     monotonic: Callable[[], float] = time.monotonic,
+    is_cancelled: Callable[[], bool] | None = None,
 ) -> ProfessionalSearchResult:
     if not _valid_limit(max_profiles, GITHUB_MAX_USER_SEARCH_RESULTS):
         return _failure(GITHUB_PROVIDER_ID, "invalid_response", "invalid_profile_limit")
@@ -229,6 +241,8 @@ def search_github_people(
     direct_candidates = _validated_candidate_logins(candidate_logins)
     if direct_candidates is None:
         return _failure(GITHUB_PROVIDER_ID, "invalid_response", "invalid_candidate_logins")
+    if _cancellation_requested(is_cancelled):
+        return _cancelled_result(GITHUB_PROVIDER_ID)
 
     started_at = monotonic() if time_budget_seconds is not None else None
     search_failure: ProfessionalSearchResult | None = None
@@ -259,6 +273,8 @@ def search_github_people(
                     "github_search_invalid_payload",
                 )
                 search_logins = ()
+    if _cancellation_requested(is_cancelled):
+        return _cancelled_result(GITHUB_PROVIDER_ID)
 
     concatenated_login = _normalized_name_login(normalized_name)
     ordered_logins = _dedupe(
@@ -276,6 +292,8 @@ def search_github_people(
     )
     seen_urls: set[str] = set()
     for login in ordered_logins[:maximum_fetches]:
+        if _cancellation_requested(is_cancelled):
+            return _cancelled_result(GITHUB_PROVIDER_ID, profiles=tuple(profiles))
         if (
             started_at is not None
             and time_budget_seconds is not None
@@ -288,6 +306,8 @@ def search_github_people(
         except SafeFetchError as exc:
             fetch_failures.append(_safe_fetch_failure(GITHUB_PROVIDER_ID, exc))
             continue
+        if _cancellation_requested(is_cancelled):
+            return _cancelled_result(GITHUB_PROVIDER_ID, profiles=tuple(profiles))
         failure = _response_failure(GITHUB_PROVIDER_ID, response, not_found_is_no_result=True)
         if failure is not None:
             fetch_failures.append(failure)
@@ -787,4 +807,26 @@ def _failure(
         status=status,
         profiles=(),
         error_code=error_code,
+    )
+
+
+def _cancellation_requested(callback: Callable[[], bool] | None) -> bool:
+    if callback is None:
+        return False
+    try:
+        return bool(callback())
+    except Exception:
+        return False
+
+
+def _cancelled_result(
+    provider_id: str,
+    *,
+    profiles: tuple[ProfessionalProfile, ...] = (),
+) -> ProfessionalSearchResult:
+    return ProfessionalSearchResult(
+        provider_id=provider_id,
+        status="partial_success" if profiles else "cancelled",
+        profiles=profiles,
+        error_code="professional_search_cancelled",
     )

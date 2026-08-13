@@ -12,17 +12,19 @@ function safeProfileHref(value: string): string | null {
   }
 }
 
-function words(value: string): string {
-  return value.replaceAll("_", " ").replaceAll(".", " ");
-}
-
 function candidateTitle(candidate: AccountCandidate): string {
   return candidate.display_name?.trim() || `@${candidate.handle}`;
+}
+
+interface AnchorChoice {
+  candidate: AccountCandidate;
+  candidates: AccountCandidate[];
 }
 
 export function CandidateResults({
   candidates,
   running,
+  stopped = false,
   awaitingAnchor = false,
   selectingCandidateId = null,
   anchorError = "",
@@ -30,6 +32,7 @@ export function CandidateResults({
 }: {
   candidates: CandidateList;
   running: boolean;
+  stopped?: boolean;
   awaitingAnchor?: boolean;
   selectingCandidateId?: string | null;
   anchorError?: string;
@@ -49,145 +52,108 @@ export function CandidateResults({
               ? "Loading starting-profile choices…"
               : running
                 ? "Waiting for the first catalog match…"
-                : "No candidates found."}
+                : stopped
+                  ? "Search stopped."
+                  : "No candidates found."}
           </h2>
           <p>
             {awaitingAnchor
               ? "The scan found competing identity signals. The matching profiles are being prepared so you can choose the one you recognize."
               : running
-              ? "Profiles will appear here as Maigret scan shards finish."
-              : "The completed catalog checks did not return a claimed account."}
+                ? "Profiles will appear here as Maigret scan shards finish."
+                : stopped
+                  ? "Search stopped before any candidates were saved."
+                  : "The completed catalog checks did not return a claimed account."}
           </p>
         </div>
       </section>
     );
   }
 
-  return (
-    <section className="candidateSection" aria-live="polite">
-      <div className="candidateSectionHeading">
-        <div>
-          <div className="eyebrow">Progressive account map</div>
-          <h2>Possible profiles</h2>
-        </div>
-        <div className="candidateCount">
-          <strong>{candidates.items.length}</strong>
-          <span>{candidates.items.length === 1 ? "candidate" : "candidates"}</span>
-        </div>
-      </div>
+  if (awaitingAnchor) {
+    const eligible = candidates.items.filter((candidate) => candidate.anchor_eligible);
+    const anchorPool = eligible.length ? eligible : candidates.items;
+    const choiceMap = new Map<string, AnchorChoice>();
 
-      {awaitingAnchor ? (
-        <section
-          className="anchorCheckpoint"
-          aria-labelledby="anchor-checkpoint-title"
-          aria-describedby="anchor-checkpoint-instructions"
-          aria-busy={selectingCandidateId !== null}
-        >
+    for (const candidate of anchorPool) {
+      const key = candidate.display_name?.trim().toLocaleLowerCase() || candidate.candidate_id;
+      const current = choiceMap.get(key);
+      if (current) {
+        current.candidates.push(candidate);
+      } else {
+        choiceMap.set(key, { candidate, candidates: [candidate] });
+      }
+    }
+
+    const anchorChoices = Array.from(choiceMap.values());
+
+    return (
+      <section
+        className="traceCheckpoint"
+        aria-labelledby="anchor-checkpoint-title"
+        aria-describedby="anchor-checkpoint-instructions"
+        aria-busy={selectingCandidateId !== null}
+      >
+        <div className="traceCheckpointStatus">
+          <strong>Paused</strong>
+          <span>professional enrichment is waiting on this answer</span>
+        </div>
+        <div className="anchorCheckpoint">
+          <span className="traceSrOnly">Choose the known starting profile</span>
           <div className="eyebrow">One quick checkpoint</div>
-          <h3 id="anchor-checkpoint-title">
-            Choose the known starting profile
-          </h3>
+          <h1 id="anchor-checkpoint-title">
+            The same handle carries two public names.
+          </h1>
           <p id="anchor-checkpoint-instructions">
-            The same handle appears with more than one public name. Select the
-            exact-handle profile you recognize, and discovery will use it to
-            prioritize the rest of the search. This does not automatically merge
-            the other accounts.
+            Pick the one you recognize and the search will prioritize it. The other
+            accounts stay in the brief either way — this does not merge them.
           </p>
           {anchorError ? (
             <p className="anchorError" role="alert">
               {anchorError}
             </p>
           ) : null}
-        </section>
-      ) : null}
+        </div>
 
-      <p className="candidateCaution">
-        These are accounts where the identifier appears to exist. Handle reuse alone
-        does not show that the accounts belong to the same person.
-      </p>
+        <div className="traceCheckpointGrid">
+          {anchorChoices.map(({ candidate, candidates: groupedCandidates }) => {
+            const isSelecting = selectingCandidateId === candidate.candidate_id;
+            const isSelected = candidate.selection_state === "included";
+            const platforms = groupedCandidates
+              .map((item) => item.platform)
+              .join(" · ");
 
-      <div className="candidateGrid">
-        {candidates.items.map((candidate) => {
-          const profileHref = safeProfileHref(candidate.profile_url);
-          const canBeAnchor = Boolean(
-            awaitingAnchor &&
-              candidate.anchor_eligible &&
-              onSelectAnchor,
-          );
-          const isSelecting = selectingCandidateId === candidate.candidate_id;
-          const isSelected = candidate.selection_state === "included";
-          return (
-            <article
-              className={[
-                "candidateCard",
-                canBeAnchor ? "candidateCardSelectable" : "",
-                isSelected ? "candidateCardSelected" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              key={candidate.candidate_id}
-            >
-              <div className="candidateCardTop">
-                <span className="candidatePlatform">{candidate.platform}</span>
-                <span
-                  className={`candidateTier candidateTier-${candidate.identity_tier}`}
-                >
-                  {candidate.identity_tier === "possible"
-                    ? "Possible account"
-                    : "Weak lead"}
-                </span>
-              </div>
-
-              <h3>{candidateTitle(candidate)}</h3>
-              {candidate.display_name ? (
-                <p className="candidateHandle">@{candidate.handle}</p>
-              ) : null}
-
-              <div className="candidateSignals">
-                <span>{words(candidate.relationship)}</span>
-                {candidate.is_similar ? <span>Similar handle</span> : <span>Exact handle</span>}
-                <span>{candidate.evidence.length} evidence record(s)</span>
-              </div>
-
-              {candidate.evidence.length ? (
-                <details className="candidateEvidence">
-                  <summary>Why this appeared</summary>
-                  <ul>
-                    {candidate.evidence.map((item) => (
-                      <li key={item.site_check_id}>
-                        <strong>{item.site_name}</strong>
-                        <span>
-                          {words(item.discovery_method)} · {words(item.status)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
-
-              {profileHref ? (
-                <a
-                  className="candidateLink"
-                  href={profileHref}
-                  rel="noopener noreferrer"
-                  referrerPolicy="no-referrer"
-                  target="_blank"
-                >
-                  Open public profile ↗
-                </a>
-              ) : (
-                <span className="candidateLinkUnavailable">
-                  Secure profile link unavailable
-                </span>
-              )}
-
-              {canBeAnchor ? (
+            return (
+              <article className="traceCheckpointChoice" key={candidate.candidate_id}>
+                <div className="traceCheckpointChoiceMeta">
+                  <strong>{platforms}</strong>
+                  <span>
+                    {groupedCandidates.length} {groupedCandidates.length === 1 ? "account" : "accounts"}
+                  </span>
+                </div>
+                <h2>{candidateTitle(candidate)}</h2>
+                <ul className="traceEvidenceSignals">
+                  <li data-signal="support">
+                    Full name stated on {groupedCandidates.length === 1 ? "the profile" : "these profiles"}
+                  </li>
+                  <li data-signal="support">
+                    Exact handle on {groupedCandidates.length} public {groupedCandidates.length === 1 ? "account" : "accounts"}
+                  </li>
+                  <li data-signal="limit">
+                    Handle reuse alone does not establish one person
+                  </li>
+                </ul>
                 <button
                   className="candidateAnchorButton"
                   type="button"
                   onClick={() => onSelectAnchor?.(candidate.candidate_id)}
-                  disabled={selectingCandidateId !== null || isSelected}
-                  aria-label={`Use ${candidate.display_name} on ${candidate.platform}, @${candidate.handle}, as the known starting profile`}
+                  disabled={
+                    selectingCandidateId !== null ||
+                    isSelected ||
+                    !candidate.anchor_eligible ||
+                    !onSelectAnchor
+                  }
+                  aria-label={`Use ${candidateTitle(candidate)} on ${platforms}, @${candidate.handle}, as the known starting profile`}
                 >
                   {isSelected
                     ? "Starting profile selected"
@@ -195,7 +161,61 @@ export function CandidateResults({
                       ? "Using this profile…"
                       : "Use as starting profile"}
                 </button>
-              ) : null}
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="traceCheckpointFallback">
+          <span>Recognize neither?</span>
+          <p>The search continues with both names open if the selection window expires.</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="traceFound" aria-live="polite">
+      <div className="traceFoundHeading">
+        <strong>Found so far</strong>
+        <span>
+          {candidates.items.length} {candidates.items.length === 1 ? "candidate" : "candidates"} · Handle reuse alone is only a lead
+        </span>
+      </div>
+
+      <div className="traceFoundList">
+        {candidates.items.map((candidate) => {
+          const profileHref = safeProfileHref(candidate.profile_url);
+          return (
+            <article
+              className={`traceFoundRow ${candidate.identity_tier === "weak" ? "traceFoundRowWeak" : ""}`}
+              key={candidate.candidate_id}
+            >
+              <div className="traceFoundIdentity">
+                <strong>{candidate.platform}</strong>
+                <span>@{candidate.handle}</span>
+              </div>
+              <div className="traceFoundDescription">
+                <strong>{candidateTitle(candidate)}</strong>
+                <span>
+                  {candidate.evidence.length
+                    ? `${candidate.evidence.length} public ${candidate.evidence.length === 1 ? "signal" : "signals"}`
+                    : "No additional profile detail"}
+                </span>
+              </div>
+              {profileHref ? (
+                <a
+                  className="traceFoundLink"
+                  href={profileHref}
+                  rel="noopener noreferrer"
+                  referrerPolicy="no-referrer"
+                  target="_blank"
+                >
+                  {candidate.is_similar ? "Similar handle" : "Exact handle"} ↗
+                </a>
+              ) : (
+                <span className="traceFoundLink traceFoundLinkUnavailable">Link unavailable</span>
+              )}
             </article>
           );
         })}

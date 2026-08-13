@@ -6,9 +6,11 @@ const readWebFile = (path) =>
   readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("the discovery homepage remains private and presents one flexible search input", async () => {
-  const [layout, page] = await Promise.all([
+  const [layout, page, api, nextConfig] = await Promise.all([
     readWebFile("app/layout.tsx"),
     readWebFile("app/page.tsx"),
+    readWebFile("lib/api.ts"),
+    readWebFile("next.config.ts"),
   ]);
 
   assert.match(layout, /index: false/);
@@ -18,6 +20,9 @@ test("the discovery homepage remains private and presents one flexible search in
   assert.match(page, /infers platform context/i);
   assert.match(page, /FootprintSearchForm/);
   assert.match(page, /Candidate profiles and coverage appear progressively/i);
+  assert.match(api, /NEXT_PUBLIC_API_BASE_URL \?\? "\/api"/);
+  assert.match(nextConfig, /source: "\/api\/:path\*"/);
+  assert.match(nextConfig, /destination: "http:\/\/127\.0\.0\.1:8800\/:path\*"/);
 });
 
 test("the legacy search form remains available for staged GitHub verification", async () => {
@@ -38,7 +43,11 @@ test("the legacy search form remains available for staged GitHub verification", 
 });
 
 test("the footprint form submits a discriminated seed and opens the discovery route", async () => {
-  const searchForm = await readWebFile("components/FootprintSearchForm.tsx");
+  const [searchForm, synthesisModels, revampStyles] = await Promise.all([
+    readWebFile("components/FootprintSearchForm.tsx"),
+    readWebFile("lib/synthesis-models.ts"),
+    readWebFile("app/revamp.css"),
+  ]);
 
   assert.match(searchForm, /name="identifier"/);
   assert.match(searchForm, /placeholder="Handle or public profile URL"/);
@@ -56,6 +65,68 @@ test("the footprint form submits a discriminated seed and opens the discovery ro
   assert.match(searchForm, /value: "quick"/);
   assert.match(searchForm, /value: "deep"/);
   assert.match(searchForm, /search_mode: searchMode/);
+  assert.match(searchForm, /useState<FootprintSynthesisModel>\(DEFAULT_SYNTHESIS_MODEL\)/);
+  assert.match(
+    searchForm,
+    /\.\.\.\(searchMode === "deep"[\s\S]*\? \{ synthesis_model: synthesisModel \}[\s\S]*: \{\}\)/,
+  );
+  assert.match(searchForm, /name="synthesis_model"/);
+  assert.match(searchForm, /<select/);
+  assert.match(searchForm, /htmlFor="synthesis-model"/);
+  assert.match(searchForm, /selectedSynthesisOption\.speedLabel/);
+  assert.doesNotMatch(searchForm, /<input[^>]*name="synthesis_model"/);
+  assert.match(searchForm, /aria-describedby="synthesis-model-note"/);
+  assert.match(searchForm, /Prices and relative latency estimates can change/);
+  assert.match(searchForm, /varies by model/);
+  assert.match(synthesisModels, /"openai\/gpt-5\.6-luna"/);
+  assert.match(synthesisModels, /"openai\/gpt-5\.4-nano"/);
+  assert.match(synthesisModels, /"openai\/gpt-5\.4-mini"/);
+  assert.match(synthesisModels, /"openai\/gpt-oss-120b"/);
+  assert.match(synthesisModels, /"deepseek\/deepseek-v4-flash-0731"/);
+  assert.match(synthesisModels, /"qwen\/qwen3\.5-35b-a3b"/);
+  assert.match(synthesisModels, /"z-ai\/glm-5\.2"/);
+  assert.match(synthesisModels, /DEFAULT_SYNTHESIS_MODEL/);
+  assert.match(synthesisModels, /Balanced value/);
+  assert.match(synthesisModels, /Fast budget/);
+  assert.match(synthesisModels, /Quality/);
+  assert.doesNotMatch(synthesisModels, /badge:/);
+  assert.doesNotMatch(searchForm, /option\.badge/);
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.10",[\s\S]*outputPrice: "\$0\.60"/,
+  );
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.20",[\s\S]*outputPrice: "\$1\.25"/,
+  );
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.75",[\s\S]*outputPrice: "\$4\.50"/,
+  );
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.037",[\s\S]*outputPrice: "\$0\.17"/,
+  );
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.08",[\s\S]*outputPrice: "\$0\.18"/,
+  );
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.14",[\s\S]*outputPrice: "\$1\.00"/,
+  );
+  assert.match(
+    synthesisModels,
+    /inputPrice: "\$0\.76",[\s\S]*outputPrice: "\$2\.42"/,
+  );
+  assert.match(revampStyles, /\.traceModelPicker/);
+  assert.match(revampStyles, /\.traceModelControl select:focus-visible/);
+  assert.match(revampStyles, /\.traceModelSummary/);
+  assert.doesNotMatch(revampStyles, /\.traceModelOptions/);
+  assert.match(
+    revampStyles,
+    /@media \(max-width: 720px\)[\s\S]*\.traceModelPicker\s*\{[\s\S]*grid-template-columns: 1fr/,
+  );
   assert.match(searchForm, /Focused retrieval/i);
   assert.match(searchForm, /broader 56-site scan and full professional search/i);
   assert.match(searchForm, /<legend>Search depth<\/legend>/);
@@ -87,24 +158,29 @@ test("external evidence links use no-opener and no-referrer protections", async 
 });
 
 test("the footprint client polls candidates and renders the terminal evidence-linked brief", async () => {
-  const [api, experience, candidates, brief, route, styles] = await Promise.all([
+  const [api, experience, candidates, brief, traceBrief, route, styles, revampStyles] = await Promise.all([
     readWebFile("lib/api.ts"),
     readWebFile("components/FootprintJobExperience.tsx"),
     readWebFile("components/CandidateResults.tsx"),
     readWebFile("components/FootprintBrief.tsx"),
+    readWebFile("components/TraceFootprintBrief.tsx"),
     readWebFile("app/footprint/[jobId]/page.tsx"),
     readWebFile("app/globals.css"),
+    readWebFile("app/revamp.css"),
   ]);
 
   assert.match(api, /\/v1\/footprint-jobs/);
   assert.match(api, /\/candidates/);
   assert.match(api, /createFootprintJob/);
   assert.match(api, /getFootprintJob/);
+  assert.match(api, /cancelFootprintJob/);
+  assert.match(api, /method: "POST"/);
   assert.match(api, /getFootprintCandidates/);
   assert.match(api, /selectFootprintAnchor/);
   assert.match(api, /getFootprintBrief/);
   assert.match(api, /getFootprintEvidence/);
   assert.match(api, /\/anchor/);
+  assert.match(api, /\/cancel/);
   assert.match(api, /\/brief/);
   assert.match(api, /\/evidence/);
   assert.match(experience, /setTimeout\(refresh/);
@@ -124,6 +200,7 @@ test("the footprint client polls candidates and renders the terminal evidence-li
   assert.match(experience, /Finalizing/);
   assert.match(experience, /deepProgressStepState/);
   assert.match(experience, /deepProgressStep-paused/);
+  assert.match(experience, /className="traceStepCompleteCheck"/);
   assert.match(experience, /Progress paused/);
   assert.match(experience, /Elapsed/);
   assert.match(experience, /Status <strong>✓ Complete<\/strong>/);
@@ -144,12 +221,28 @@ test("the footprint client polls candidates and renders the terminal evidence-li
   assert.match(experience, /"awaiting_anchor"/);
   assert.match(experience, /Choose a starting profile/);
   assert.match(experience, /selectFootprintAnchor/);
+  assert.match(experience, /cancelFootprintJob/);
+  assert.match(experience, /Stop search/);
+  assert.match(experience, /onClick=\{stopSearch\}/);
+  assert.match(experience, /Stopping…/);
+  assert.match(experience, /job && !terminal/);
+  assert.match(experience, /aria-busy=\{stopping\}/);
+  assert.match(experience, /stopSearchError/);
+  assert.match(experience, /terminalStatuses\.has\(current\.status\)\) setStopError\(""\)/);
   assert.match(experience, /setPollGeneration/);
   assert.match(experience, /\[jobId, pollGeneration\]/);
   assert.match(experience, /onSelectAnchor=\{chooseAnchor\}/);
   assert.match(experience, /footprint report is unavailable/);
   assert.match(experience, /setPollingStopped\(true\)/);
   assert.match(experience, /maxTransientRetries/);
+  assert.match(experience, /Start another search/);
+  assert.match(experience, /className="traceJobFooter"/);
+  assert.match(experience, /startDeepRun\(model: FootprintSynthesisModel\)/);
+  assert.match(experience, /synthesis_model: model/);
+  assert.match(traceBrief, /<span>Story model<\/span>/);
+  assert.match(traceBrief, /SYNTHESIS_MODEL_OPTIONS\.map/);
+  assert.doesNotMatch(traceBrief, /option\.badge/);
+  assert.match(traceBrief, /onRunDeep\?\.\(selectedModel\)/);
   assert.ok(
     experience.indexOf("<FootprintBrief") <
       experience.indexOf("<CandidateResults"),
@@ -162,6 +255,7 @@ test("the footprint client polls candidates and renders the terminal evidence-li
   assert.match(candidates, /Choose the known starting profile/);
   assert.match(candidates, /candidate\.anchor_eligible/);
   assert.match(candidates, /Use as starting profile/);
+  assert.match(candidates, /Search stopped before any candidates were saved/);
   assert.match(candidates, /aria-busy=\{selectingCandidateId !== null\}/);
   assert.match(candidates, /role="alert"/);
   assert.match(candidates, /noopener noreferrer/);
@@ -203,11 +297,22 @@ test("the footprint client polls candidates and renders the terminal evidence-li
   assert.match(styles, /\.narrativeSources a,[\s\S]*max-width: 100%/);
   assert.match(styles, /\.anchorCheckpoint/);
   assert.match(styles, /\.candidateAnchorButton:focus-visible/);
+  assert.match(styles, /\.stopSearchButton:focus-visible/);
+  assert.match(styles, /\.stopSearchButton:disabled/);
   assert.match(styles, /\.profileTimeline/);
   assert.match(styles, /\.deepProgressCard/);
   assert.match(styles, /\.deepProgressSteps/);
   assert.match(styles, /\.deepProgressStep-running/);
   assert.match(styles, /@keyframes deep-progress-sweep/);
+  assert.match(
+    revampStyles,
+    /\.traceStepStatusRing-complete\s*\{[\s\S]*?box-shadow: none;/,
+  );
+  assert.match(
+    revampStyles,
+    /\.traceStepCompleteCheck\s*\{[\s\S]*?stroke: #fff;/,
+  );
+  assert.match(revampStyles, /\.traceQuickModelSelect:focus-visible/);
   assert.doesNotMatch(
     styles,
     /\.profile(?:Purpose|Activity|Risk|Mitigation)/,

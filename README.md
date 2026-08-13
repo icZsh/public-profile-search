@@ -68,16 +68,36 @@ make web
 Open `http://localhost:3417` and enter a public handle or supported public profile URL.
 The browser polls the owner-scoped job and candidate endpoints while
 the Maigret worker checks each shard, then renders the frozen evidence-linked brief.
+The outbox dispatcher also reclaims expired worker leases and closes jobs at their
+retrieval cutoff, so a lost task cannot leave discovery permanently in progress.
 After the root shards finish, the professional worker processes the mode-specific
 adaptive second wave. Exa is optional: set the server-only `EXA_API_KEY` to enable indexed
 LinkedIn people results. Quick intentionally skips professional retrieval when Exa is
 unavailable; Deep can still use the GitHub public-profile path without it.
 
+To keep the complete local stack running after terminal closure and restart it at
+login, install the macOS LaunchAgent:
+
+```bash
+./scripts/install-tracebrief-service.sh
+```
+
+The persistent service is available at
+`http://isaaczhus-mac-mini.local:3500`. It uses a same-origin `/api` proxy so the
+page works from another device on the same trusted LAN while the API remains bound
+to loopback. See [the persistent service runbook](./docs/persistent-local-service.md)
+for status, logs, and removal commands.
+
 Deep story composition is gateway-configurable. The checked-in example selects
 `GROUNDED_SYNTHESIS_PROVIDER=openrouter`; add a server-only `OPENROUTER_API_KEY` and
 choose an OpenRouter model slug with `OPENROUTER_SYNTHESIS_MODEL` (default:
 `~deepseek/deepseek-v4-flash-latest`, OpenRouter's rolling DeepSeek V4 Flash
-alias). Direct OpenAI remains available with
+alias). The browser's Deep-mode picker instead snapshots one curated OpenRouter model
+per job. It includes GPT-5.6 Luna, GPT-5.4 Nano, and GPT-5.4 Mini, plus the
+open-weight GPT-OSS 120B, DeepSeek V4 Flash, Qwen3.5 35B-A3B, and GLM 5.2.
+The selection remains stable while retrieval runs. API clients that omit
+`synthesis_model` continue to use the configured gateway and model. Direct OpenAI
+remains available with
 `GROUNDED_SYNTHESIS_PROVIDER=openai`, `OPENAI_API_KEY`, and
 `OPENAI_SYNTHESIS_MODEL`. OpenRouter requests use its fixed
 [`/api/v1/responses`](https://openrouter.ai/docs/api/reference/responses/overview)

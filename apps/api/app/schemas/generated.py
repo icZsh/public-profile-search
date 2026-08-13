@@ -518,12 +518,30 @@ FootprintSeedResponse = Annotated[
 ]
 
 
+FootprintSynthesisModelValue = Literal[
+    "openai/gpt-5.6-luna",
+    "openai/gpt-5.4-nano",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-oss-120b",
+    "deepseek/deepseek-v4-flash-0731",
+    "qwen/qwen3.5-35b-a3b",
+    "z-ai/glm-5.2",
+]
+
+
 class CreateFootprintJobRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seed: FootprintSeedRequest
     search_mode: Literal["quick", "deep"] = "quick"
+    synthesis_model: FootprintSynthesisModelValue | None = None
     locale: Literal["en-US", "zh-CN"] = "en-US"
+
+    @model_validator(mode="after")
+    def require_deep_mode_for_synthesis_model(self) -> "CreateFootprintJobRequest":
+        if self.synthesis_model is not None and self.search_mode != "deep":
+            raise ValueError("synthesis_model is only available in deep mode")
+        return self
 
 
 class FootprintCoverageResponse(BaseModel):
@@ -577,6 +595,7 @@ class FootprintJobResponse(BaseModel):
     deep_progress: FootprintDeepProgressResponse | None
     seed: FootprintSeedResponse
     search_mode: Literal["quick", "deep"] | None
+    synthesis_model: FootprintSynthesisModelValue | None
     coverage: FootprintCoverageResponse
     catalog: FootprintCatalogResponse
     events_url: str

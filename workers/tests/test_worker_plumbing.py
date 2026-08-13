@@ -24,7 +24,7 @@ from apps.api.app.models.entities import (
 from apps.api.app.services.deletion import delete_job
 from apps.api.app.services.maigret_runs import process_maigret_scan_run
 from workers.maintenance.deadline_watchdog import finalize_expired_jobs
-from workers.maintenance.outbox_dispatcher import dispatch_once
+from workers.maintenance.outbox_dispatcher import dispatch_once, maintenance_once
 from workers.maintenance.reconciler import reclaim_expired_leases
 from workers.orchestrator.celery_app import celery_app
 
@@ -245,6 +245,46 @@ def test_reconciler_retries_maigret_run_on_the_same_queue():
         assert message is not None
         assert message.topic == "maigret_scan_run"
         assert message.dedupe_key == f"maigret-scan:{run_id}:generation:2"
+
+
+def test_maintenance_pass_reclaims_expired_running_maigret_shard():
+    now = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
+    factory = session_factory()
+    _snapshot_id, _job_id, run_id = add_maigret_run(
+        factory,
+        now=now,
+        deadline_at=now + timedelta(minutes=2),
+    )
+
+    maintenance_once(
+        factory,
+        settings=SimpleNamespace(),
+        clock=FixedClock(now),
+    )
+
+    with factory() as session:
+        run = session.get(ProviderRun, run_id)
+        scan = session.get(MaigretScanRun, run_id)
+        attempt = session.scalar(
+            select(ProviderAttempt).where(
+                ProviderAttempt.provider_run_id == run_id,
+                ProviderAttempt.generation == 1,
+            )
+        )
+        retry_message = session.scalar(
+            select(OutboxMessage).where(
+                OutboxMessage.payload["provider_run_id"].as_string() == run_id,
+                OutboxMessage.dispatched_at.is_(None),
+            )
+        )
+        assert run is not None and run.status == "retry_scheduled"
+        assert run.lease_expires_at is None
+        assert scan is not None and scan.status == "retry_scheduled"
+        assert scan.error_code == "maigret_lease_expired"
+        assert attempt is not None and attempt.status == "abandoned_lease_expired"
+        assert attempt.error_code == "lease_expired"
+        assert retry_message is not None
+        assert retry_message.topic == "maigret_scan_run"
 
 
 def test_reconciler_closes_expired_maigret_run_at_cutoff_without_retry():

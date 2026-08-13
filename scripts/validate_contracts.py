@@ -68,6 +68,7 @@ def _assert_security_and_headers(openapi: dict[str, Any]) -> None:
         ("/v1/footprint-jobs", "post"),
         ("/v1/footprint-jobs/{job_id}", "get"),
         ("/v1/footprint-jobs/{job_id}", "delete"),
+        ("/v1/footprint-jobs/{job_id}/cancel", "post"),
         ("/v1/footprint-jobs/{job_id}/candidates", "get"),
         ("/v1/footprint-jobs/{job_id}/anchor", "post"),
         ("/v1/footprint-jobs/{job_id}/brief", "get"),
@@ -161,6 +162,7 @@ def main() -> None:
         "/v1/search-jobs/{job_id}/brief",
         "/v1/footprint-jobs",
         "/v1/footprint-jobs/{job_id}",
+        "/v1/footprint-jobs/{job_id}/cancel",
         "/v1/footprint-jobs/{job_id}/candidates",
         "/v1/footprint-jobs/{job_id}/anchor",
         "/v1/footprint-jobs/{job_id}/brief",
@@ -179,6 +181,7 @@ def main() -> None:
         ("/v1/footprint-jobs", "post"): "createFootprintJob",
         ("/v1/footprint-jobs/{job_id}", "get"): "getFootprintJob",
         ("/v1/footprint-jobs/{job_id}", "delete"): "deleteFootprintJob",
+        ("/v1/footprint-jobs/{job_id}/cancel", "post"): "cancelFootprintJob",
         ("/v1/footprint-jobs/{job_id}/candidates", "get"): "listFootprintCandidates",
         ("/v1/footprint-jobs/{job_id}/anchor", "post"): "selectFootprintAnchor",
         ("/v1/footprint-jobs/{job_id}/brief", "get"): "getFootprintBrief",
@@ -299,12 +302,31 @@ def main() -> None:
     footprint_search_mode = schemas["CreateFootprintJobRequest"]["properties"]["search_mode"]
     assert footprint_search_mode["enum"] == ["quick", "deep"]
     assert footprint_search_mode["default"] == "quick"
+    synthesis_models = [
+        "openai/gpt-5.6-luna",
+        "openai/gpt-5.4-nano",
+        "openai/gpt-5.4-mini",
+        "openai/gpt-oss-120b",
+        "deepseek/deepseek-v4-flash-0731",
+        "qwen/qwen3.5-35b-a3b",
+        "z-ai/glm-5.2",
+    ]
+    assert schemas["FootprintSynthesisModel"]["enum"] == synthesis_models
+    create_footprint_job = schemas["CreateFootprintJobRequest"]
+    assert create_footprint_job["properties"]["synthesis_model"]["$ref"] == (
+        "#/components/schemas/FootprintSynthesisModel"
+    )
+    synthesis_dependency = create_footprint_job["dependentSchemas"]["synthesis_model"]
+    assert synthesis_dependency["required"] == ["search_mode"]
+    assert synthesis_dependency["properties"]["search_mode"]["const"] == "deep"
 
     footprint_job = schemas["FootprintJob"]
     assert {
         "exploration_status",
         "deep_progress",
         "seed",
+        "search_mode",
+        "synthesis_model",
         "coverage",
         "catalog",
         "events_url",
@@ -323,6 +345,10 @@ def main() -> None:
         "quick",
         "deep",
         None,
+    ]
+    assert footprint_job["properties"]["synthesis_model"]["anyOf"] == [
+        {"$ref": "#/components/schemas/FootprintSynthesisModel"},
+        {"type": "null"},
     ]
     assert (
         footprint_job["properties"]["seed"]["$ref"]
@@ -361,6 +387,11 @@ def main() -> None:
     }
     assert "deep_progress: FootprintDeepProgress | null;" in generated_typescript
     assert "finished_at: string | null;" in generated_typescript
+    assert "export type FootprintSynthesisModel" in generated_typescript
+    assert "synthesis_model?: FootprintSynthesisModel;" in generated_typescript
+    assert "synthesis_model: FootprintSynthesisModel | null;" in generated_typescript
+    for synthesis_model in synthesis_models:
+        assert f'| "{synthesis_model}"' in generated_typescript, synthesis_model
     for phase in deep_progress["properties"]["current_phase"]["enum"]:
         assert f'| "{phase}"' in generated_typescript, phase
     assert set(schemas["SelectFootprintAnchorRequest"]["required"]) == {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import "./revamp.css";
 
 export const metadata: Metadata = {
   title: "Tracebrief — public digital footprint discovery",

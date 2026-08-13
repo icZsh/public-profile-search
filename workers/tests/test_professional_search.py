@@ -235,6 +235,32 @@ def test_adaptive_exa_stops_after_configured_stagnation():
     assert observed_queries == ["one", "two"]
 
 
+def test_adaptive_exa_stops_before_spending_another_request_after_cancellation():
+    observed_queries: list[str] = []
+    cancelled = False
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal cancelled
+        observed_queries.append(str(json.loads(request.content)["query"]))
+        cancelled = True
+        return _json_response({"results": []})
+
+    result = search_exa_people_adaptive(
+        queries=("one", "two", "three"),
+        gateway=_gateway(handler),
+        request_budget=3,
+        profile_budget=10,
+        time_budget_seconds=60,
+        stagnation_query_limit=3,
+        monotonic=lambda: 0.0,
+        is_cancelled=lambda: cancelled,
+    )
+
+    assert result.status == "cancelled"
+    assert result.error_code == "professional_search_cancelled"
+    assert observed_queries == ["one"]
+
+
 def test_github_adapter_prioritizes_bounded_candidates_then_name_login_and_search():
     requested_profiles: list[str] = []
     observed_query = ""
@@ -304,6 +330,33 @@ def test_github_adapter_prioritizes_bounded_candidates_then_name_login_and_searc
         "search-four",
     ):
         assert forbidden not in serialized
+
+
+def test_github_search_stops_before_profile_fetches_after_cancellation():
+    cancelled = False
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal cancelled
+        requested_paths.append(request.url.path)
+        cancelled = True
+        return _json_response(
+            {
+                "items": [
+                    {"login": "search-one", "type": "User"},
+                ]
+            }
+        )
+
+    result = search_github_people(
+        full_name="Alice Example",
+        gateway=_gateway(handler),
+        is_cancelled=lambda: cancelled,
+    )
+
+    assert result.status == "cancelled"
+    assert result.error_code == "professional_search_cancelled"
+    assert requested_paths == ["/search/users"]
 
 
 def test_deep_github_request_budget_limits_profile_fetches():

@@ -220,7 +220,7 @@ def process_grounded_synthesis_run(
             or job.acceptance_epoch != lease.acceptance_epoch
         )
         if stale:
-            if attempt:
+            if attempt and attempt.status == "running" and attempt.finished_at is None:
                 attempt.finished_at = clock.now()
                 attempt.status = "completed_after_fence"
                 attempt.completion_disposition = "late_payload_discarded"
@@ -370,7 +370,10 @@ def _lease_run(
 
 
 def _lease_heartbeat_interval(lease_seconds: int) -> float:
-    return max(1.0, min(30.0, lease_seconds / 3.0))
+    # This heartbeat doubles as cooperative user-cancellation detection for the
+    # potentially expensive synthesis request, so do not let a long lease make
+    # Stop search take tens of seconds to reach provider I/O.
+    return max(0.5, min(2.0, lease_seconds / 3.0))
 
 
 def _renew_synthesis_lease(

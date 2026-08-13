@@ -14,7 +14,7 @@ import type {
 } from "@public-profile-search/generated-api-client";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8800";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 const API_TOKEN =
   process.env.NEXT_PUBLIC_PROTOTYPE_API_TOKEN ?? "local-prototype-token";
 const USER_ID =
@@ -202,6 +202,18 @@ export async function getFootprintJob(jobId: string): Promise<FootprintJob> {
       {
         headers: headers(),
         cache: "no-store",
+      },
+    ),
+  );
+}
+
+export async function cancelFootprintJob(jobId: string): Promise<FootprintJob> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/cancel`,
+      {
+        method: "POST",
+        headers: headers(),
       },
     ),
   );

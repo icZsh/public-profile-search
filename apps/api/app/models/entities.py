@@ -82,6 +82,7 @@ class SearchJob(Base):
     seed_identifier: Mapped[str | None] = mapped_column(String(160), nullable=True)
     normalized_seed: Mapped[str | None] = mapped_column(String(240), nullable=True)
     search_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    synthesis_model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     catalog_profile: Mapped[str | None] = mapped_column(String(40), nullable=True)
     catalog_snapshot_id: Mapped[str | None] = mapped_column(
         String(36),

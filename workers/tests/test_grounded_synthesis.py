@@ -901,7 +901,7 @@ def test_responses_client_uses_fixed_host_current_contract_and_parses_success():
     assert observed["authorization"] == "Bearer test-api-key"
     assert observed["timeout"] == {
         "connect": 10.0,
-        "read": None,
+        "read": 300.0,
         "write": 30.0,
         "pool": 10.0,
     }
@@ -951,7 +951,7 @@ def test_explicit_finite_timeout_remains_available_for_non_deep_callers():
     }
 
 
-def test_cancellation_event_aborts_inflight_unbounded_http_request():
+def test_cancellation_event_aborts_inflight_deadline_free_http_request():
     class BlockingTransport(httpx.AsyncBaseTransport):
         def __init__(self) -> None:
             self.started = Event()
@@ -964,7 +964,7 @@ def test_cancellation_event_aborts_inflight_unbounded_http_request():
             except asyncio.CancelledError:
                 self.cancelled.set()
                 raise
-            raise AssertionError("The unbounded request was not cooperatively cancelled")
+            raise AssertionError("The deadline-free request was not cooperatively cancelled")
 
     transport = BlockingTransport()
     cancel_event = Event()

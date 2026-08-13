@@ -22,6 +22,14 @@ from apps.api.app.services.maigret_runs import (
 )
 from apps.api.app.services.maigret_runs import finalize_discovery_if_complete
 
+_TERMINAL_DISCOVERY_JOB_STATES = {
+    "ready",
+    "ready_partial",
+    "no_candidates",
+    "failed",
+    "cancelled",
+}
+
 
 def _finalize_expired_discovery_job(
     session_factory: sessionmaker[Session],
@@ -32,7 +40,11 @@ def _finalize_expired_discovery_job(
 ) -> bool:
     with session_factory() as session, session.begin():
         job = session.scalar(select(SearchJob).where(SearchJob.id == job_id).with_for_update())
-        if not job or job.job_kind != "footprint_discovery":
+        if (
+            not job
+            or job.job_kind != "footprint_discovery"
+            or job.status in _TERMINAL_DISCOVERY_JOB_STATES
+        ):
             return False
         runs = session.scalars(
             select(ProviderRun).where(ProviderRun.job_id == job_id).with_for_update()
@@ -82,6 +94,7 @@ def _advance_expired_anchor_job(
         if (
             not job
             or job.job_kind != "footprint_discovery"
+            or job.status in _TERMINAL_DISCOVERY_JOB_STATES
             or job.exploration_status != "awaiting_anchor"
             or anchor_selection_is_open(job=job, now=now)
         ):

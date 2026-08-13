@@ -56,6 +56,7 @@ _RESULT_STATUSES = {
     "provider_error",
     "invalid_response",
     "skipped_configuration",
+    "cancelled",
 }
 _ADAPTIVE_RETRIEVAL_MODES = {"adaptive", "deep"}
 
@@ -78,18 +79,28 @@ def process_professional_search_run(
         return
     generation, acceptance_epoch, job_id, provider_id, query_config = lease
 
+    def is_cancelled() -> bool:
+        return not _professional_lease_is_current(
+            session_factory,
+            provider_run_id=provider_run_id,
+            generation=generation,
+            acceptance_epoch=acceptance_epoch,
+            job_id=job_id,
+        )
+
     result = _execute_search(
         settings=settings,
         provider_id=provider_id,
         query_config=query_config,
         gateway=gateway or SafeFetchGateway(settings),
+        is_cancelled=is_cancelled,
     )
 
     with session_factory() as session, session.begin():
+        job = session.scalar(select(SearchJob).where(SearchJob.id == job_id).with_for_update())
         run = session.scalar(
             select(ProviderRun).where(ProviderRun.id == provider_run_id).with_for_update()
         )
-        job = session.scalar(select(SearchJob).where(SearchJob.id == job_id).with_for_update())
         attempt = session.scalar(
             select(ProviderAttempt).where(
                 ProviderAttempt.provider_run_id == provider_run_id,
@@ -106,7 +117,7 @@ def process_professional_search_run(
             or job.acceptance_epoch != acceptance_epoch
         )
         if stale:
-            if attempt:
+            if attempt and attempt.status == "running" and attempt.finished_at is None:
                 attempt.finished_at = clock.now()
                 attempt.status = "completed_after_fence"
                 attempt.completion_disposition = "late_payload_discarded"
@@ -192,6 +203,14 @@ def _lease_run(
     provider_run_id: str,
 ) -> tuple[int, int, str, str, dict[str, object]] | None:
     with session_factory() as session, session.begin():
+        run_reference = session.get(ProviderRun, provider_run_id)
+        if run_reference is None:
+            return None
+        job = session.scalar(
+            select(SearchJob)
+            .where(SearchJob.id == run_reference.job_id)
+            .with_for_update()
+        )
         run = session.scalar(
             select(ProviderRun).where(ProviderRun.id == provider_run_id).with_for_update()
         )
@@ -201,9 +220,9 @@ def _lease_run(
             or run.status not in {"pending", "retry_scheduled"}
         ):
             return None
-        job = session.scalar(select(SearchJob).where(SearchJob.id == run.job_id).with_for_update())
         if (
             not job
+            or run.job_id != job.id
             or job.job_kind != "footprint_discovery"
             or job.status in _JOB_TERMINAL_STATES
             or session.get(JobDeletionTombstone, run.job_id)
@@ -289,6 +308,7 @@ def _execute_search(
     provider_id: str,
     query_config: dict[str, object],
     gateway: SafeFetchGateway,
+    is_cancelled=None,
 ) -> ProfessionalSearchResult:
     if not bool(getattr(settings, "professional_search_enabled", False)):
         return ProfessionalSearchResult(
@@ -371,6 +391,7 @@ def _execute_search(
                         minimum=1,
                         maximum=5,
                     ),
+                    is_cancelled=is_cancelled,
                 )
             query = _query_text(query_config.get("query"), maximum=500) or full_name
             maximum = _bounded_int(
@@ -383,6 +404,7 @@ def _execute_search(
                 query=query,
                 gateway=gateway,
                 max_results=maximum,
+                is_cancelled=is_cancelled,
             )
         if provider_id == GITHUB_PROFESSIONAL_PROVIDER_ID:
             if not bool(getattr(settings, "github_people_search_enabled", False)) or not bool(
@@ -429,12 +451,14 @@ def _execute_search(
                         minimum=0.1,
                         maximum=300.0,
                     ),
+                    is_cancelled=is_cancelled,
                 )
             return search_github_people(
                 full_name=full_name,
                 gateway=gateway,
                 max_profiles=maximum,
                 candidate_logins=candidate_logins,
+                is_cancelled=is_cancelled,
             )
     except (TypeError, ValueError):
         return ProfessionalSearchResult(
@@ -790,6 +814,34 @@ def _deadline_reached(deadline, now) -> bool:
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)
     return deadline <= now
+
+
+def _professional_lease_is_current(
+    session_factory: sessionmaker[Session],
+    *,
+    provider_run_id: str,
+    generation: int,
+    acceptance_epoch: int,
+    job_id: str,
+) -> bool:
+    try:
+        with session_factory() as session:
+            job = session.get(SearchJob, job_id)
+            run = session.get(ProviderRun, provider_run_id)
+            return bool(
+                job
+                and run
+                and not session.get(JobDeletionTombstone, job_id)
+                and job.status not in _JOB_TERMINAL_STATES
+                and run.status == "running"
+                and run.lease_generation == generation
+                and run.acceptance_epoch == acceptance_epoch
+                and job.acceptance_epoch == acceptance_epoch
+            )
+    except Exception:
+        # Keep the request alive across a transient cancellation-check read
+        # failure. The completion transaction still enforces the write fence.
+        return True
 
 
 def _remaining_seconds(deadline, now) -> float:

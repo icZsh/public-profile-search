@@ -107,6 +107,15 @@ export type FootprintPlatform =
 
 export type FootprintSearchMode = "quick" | "deep";
 
+export type FootprintSynthesisModel =
+  | "openai/gpt-5.6-luna"
+  | "openai/gpt-5.4-nano"
+  | "openai/gpt-5.4-mini"
+  | "openai/gpt-oss-120b"
+  | "deepseek/deepseek-v4-flash-0731"
+  | "qwen/qwen3.5-35b-a3b"
+  | "z-ai/glm-5.2";
+
 export type FootprintSeed =
   | {
       kind: "platform_identifier";
@@ -152,6 +161,7 @@ export type FootprintSeedResponse =
 export interface CreateFootprintJobRequest {
   seed: FootprintSeed;
   search_mode?: FootprintSearchMode;
+  synthesis_model?: FootprintSynthesisModel;
   locale?: "en-US" | "zh-CN";
 }
 
@@ -209,6 +219,7 @@ export interface FootprintJob {
   deep_progress: FootprintDeepProgress | null;
   seed: FootprintSeedResponse;
   search_mode: FootprintSearchMode | null;
+  synthesis_model: FootprintSynthesisModel | null;
   coverage: FootprintCoverage;
   catalog: FootprintCatalog;
   events_url: string;

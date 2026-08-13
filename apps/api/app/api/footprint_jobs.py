@@ -31,6 +31,7 @@ from apps.api.app.services.discovery_jobs import (
     footprint_job_response,
     owner_footprint_job,
 )
+from apps.api.app.services.footprint_cancellation import cancel_footprint_job
 from apps.api.app.services.footprint_reports import (
     get_footprint_brief,
     get_footprint_evidence,
@@ -251,6 +252,27 @@ def stream_discovery_job_events(
             "Cache-Control": "private, no-store",
             "X-Robots-Tag": "noindex, nofollow",
         },
+    )
+
+
+@router.post("/{job_id}/cancel", response_model=FootprintJobResponse)
+def cancel_discovery_job(
+    job_id: UUID,
+    request: Request,
+    auth: AuthContext = Depends(require_prototype_auth),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    job = cancel_footprint_job(
+        session,
+        job_id=str(job_id),
+        user_id=auth.user_id,
+        clock=request.app.state.clock,
+    )
+    session.commit()
+    return footprint_job_response(
+        session,
+        job,
+        settings=request.app.state.settings,
     )
 
 

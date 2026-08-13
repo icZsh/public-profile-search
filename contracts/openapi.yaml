@@ -430,6 +430,30 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/cancel:
+    post:
+      tags: [Footprint discovery]
+      operationId: cancelFootprintJob
+      description: >-
+        Idempotently stops unfinished discovery work while preserving candidates
+        and evidence accepted before the cancellation fence. If normal completion
+        wins the race, the completed job is returned unchanged.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+        - $ref: "#/components/parameters/PrototypeUser"
+      responses:
+        "200":
+          description: Durable cancelled state, or an earlier terminal state unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintJob"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/footprint-jobs/{job_id}/candidates:
     get:
       tags: [Footprint discovery]
@@ -1694,6 +1718,12 @@ components:
       type: object
       additionalProperties: false
       required: [seed]
+      dependentSchemas:
+        synthesis_model:
+          required: [search_mode]
+          properties:
+            search_mode:
+              const: deep
       properties:
         seed:
           $ref: "#/components/schemas/FootprintSeed"
@@ -1705,10 +1735,25 @@ components:
             Quick runs a focused account catalog and capped Exa-only professional
             search. Deep runs a broader catalog and the full configured Exa and
             GitHub search envelope before adding a source-grounded LLM story.
+        synthesis_model:
+          $ref: "#/components/schemas/FootprintSynthesisModel"
         locale:
           type: string
           enum: [en-US, zh-CN]
           default: en-US
+    FootprintSynthesisModel:
+      type: string
+      enum:
+        - openai/gpt-5.6-luna
+        - openai/gpt-5.4-nano
+        - openai/gpt-5.4-mini
+        - openai/gpt-oss-120b
+        - deepseek/deepseek-v4-flash-0731
+        - qwen/qwen3.5-35b-a3b
+        - z-ai/glm-5.2
+      description: >-
+        Curated OpenRouter model used only for Deep story synthesis. If omitted,
+        the server's configured synthesis gateway and model remain in effect.
     FootprintCoverage:
       type: object
       additionalProperties: false
@@ -1776,6 +1821,7 @@ components:
         - deep_progress
         - seed
         - search_mode
+        - synthesis_model
         - coverage
         - catalog
         - events_url
@@ -1808,6 +1854,10 @@ components:
         search_mode:
           type: [string, "null"]
           enum: [quick, deep, null]
+        synthesis_model:
+          anyOf:
+            - $ref: "#/components/schemas/FootprintSynthesisModel"
+            - type: "null"
         coverage:
           $ref: "#/components/schemas/FootprintCoverage"
         catalog:

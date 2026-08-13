@@ -1,4 +1,5 @@
 import argparse
+import logging
 import time
 from datetime import UTC, datetime
 from typing import Protocol
@@ -6,10 +7,16 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from apps.api.app.core.clock import Clock
 from apps.api.app.core.config import get_settings
 from apps.api.app.core.db import build_engine, build_session_factory
 from apps.api.app.models.entities import OutboxMessage
+from workers.maintenance.deadline_watchdog import finalize_expired_jobs
+from workers.maintenance.reconciler import advance_discovery_jobs, reclaim_expired_leases
 from workers.orchestrator.celery_app import celery_app
+
+_LOGGER = logging.getLogger(__name__)
+_MAINTENANCE_INTERVAL_SECONDS = 1.0
 
 
 class TaskPublisher(Protocol):
@@ -113,6 +120,28 @@ def dispatch_once(
         return True
 
 
+def maintenance_once(
+    session_factory: sessionmaker[Session],
+    *,
+    settings,
+    clock,
+) -> tuple[int, int, int]:
+    """Reclaim lost work and close jobs whose bounded retrieval window expired."""
+
+    reclaimed = reclaim_expired_leases(session_factory, now=clock.now())
+    advanced = advance_discovery_jobs(
+        session_factory,
+        settings=settings,
+        clock=clock,
+    )
+    finalized = finalize_expired_jobs(
+        session_factory,
+        settings=settings,
+        clock=clock,
+    )
+    return reclaimed, advanced, finalized
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true")
@@ -120,7 +149,18 @@ def main() -> None:
     settings = get_settings()
     factory = build_session_factory(build_engine(settings.database_url))
     publisher = CeleryPublisher()
+    clock = Clock()
+    next_maintenance_at = 0.0
     while True:
+        monotonic_now = time.monotonic()
+        if monotonic_now >= next_maintenance_at:
+            try:
+                maintenance_once(factory, settings=settings, clock=clock)
+            except Exception:
+                # Broker dispatch must stay alive across a transient maintenance
+                # failure; the next interval retries the idempotent reconciliation.
+                _LOGGER.exception("Background discovery maintenance failed")
+            next_maintenance_at = monotonic_now + _MAINTENANCE_INTERVAL_SECONDS
         dispatched = dispatch_once(factory, publisher)
         if args.once:
             return

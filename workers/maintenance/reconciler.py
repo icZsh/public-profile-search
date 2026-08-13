@@ -23,6 +23,7 @@ from apps.api.app.services.professional_search_scheduling import (
 )
 
 MAIGRET_PROVIDER_ID = "maigret_discovery_v1"
+_ACTIVE_DISCOVERY_JOB_STATES = {"queued", "running", "finalizing", "discovering"}
 
 
 def _deadline_reached(deadline, now) -> bool:
@@ -55,6 +56,59 @@ def reclaim_expired_leases(session_factory: sessionmaker[Session], *, now) -> in
         )
         for run_id, job_id in candidates
     )
+
+
+def advance_discovery_jobs(
+    session_factory: sessionmaker[Session],
+    *,
+    settings,
+    clock,
+) -> int:
+    """Retry idempotent discovery scheduling/finalization after worker handoff."""
+
+    with session_factory() as session:
+        job_ids = session.scalars(
+            select(SearchJob.id).where(
+                SearchJob.job_kind == "footprint_discovery",
+                SearchJob.status.in_(_ACTIVE_DISCOVERY_JOB_STATES),
+            )
+        ).all()
+    return sum(
+        int(
+            _advance_discovery_job(
+                session_factory,
+                job_id=job_id,
+                settings=settings,
+                now=clock.now(),
+            )
+        )
+        for job_id in job_ids
+    )
+
+
+def _advance_discovery_job(
+    session_factory: sessionmaker[Session],
+    *,
+    job_id: str,
+    settings,
+    now,
+) -> bool:
+    with session_factory() as session, session.begin():
+        job = session.scalar(
+            select(SearchJob).where(SearchJob.id == job_id).with_for_update()
+        )
+        if (
+            job is None
+            or job.job_kind != "footprint_discovery"
+            or job.status not in _ACTIVE_DISCOVERY_JOB_STATES
+        ):
+            return False
+        return finalize_discovery_if_complete(
+            session,
+            job=job,
+            now=now,
+            settings=settings,
+        )
 
 
 def _reclaim_expired_lease(

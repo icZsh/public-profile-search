@@ -31,6 +31,9 @@ from apps.api.app.models.entities import (
     SearchJob,
     new_id,
 )
+from apps.api.app.services.deep_models import (
+    is_curated_deep_synthesis_model,
+)
 from apps.api.app.services.events import add_event
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -400,6 +403,22 @@ def create_footprint_job(
     search_mode = str(request_payload.get("search_mode", "quick"))
     if search_mode not in SUPPORTED_SEARCH_MODES:
         raise ApiError(422, "invalid_request", "The requested search mode is unavailable.")
+    requested_synthesis_model = request_payload.get("synthesis_model")
+    if requested_synthesis_model is not None and search_mode != "deep":
+        raise ApiError(
+            422,
+            "invalid_request",
+            "A synthesis model can only be selected for a Deep search.",
+        )
+    synthesis_model = requested_synthesis_model if search_mode == "deep" else None
+    if synthesis_model is not None and not is_curated_deep_synthesis_model(
+        synthesis_model
+    ):
+        raise ApiError(
+            422,
+            "invalid_request",
+            "The requested synthesis model is unavailable.",
+        )
     locale = str(request_payload.get("locale", "en-US"))
     if locale not in {"en-US", "zh-CN"}:
         raise ApiError(422, "invalid_request", "The requested locale is unavailable.")
@@ -429,6 +448,7 @@ def create_footprint_job(
     normalized_payload = {
         "seed": normalized_seed_payload,
         "search_mode": search_mode,
+        "synthesis_model": synthesis_model,
         "locale": locale,
         "manifest_checksum": manifest.manifest_checksum,
     }
@@ -472,6 +492,7 @@ def create_footprint_job(
         seed_identifier=identifier,
         normalized_seed=normalized_seed,
         search_mode=search_mode,
+        synthesis_model=synthesis_model,
         catalog_profile=profile.name,
         catalog_snapshot_id=snapshot.id,
         exploration_status="idle",
@@ -839,6 +860,7 @@ def footprint_job_response(
         "deep_progress": _deep_progress(session, job=job),
         "seed": seed,
         "search_mode": job.search_mode,
+        "synthesis_model": job.synthesis_model,
         "coverage": {
             "selected": int(coverage[0]),
             "completed": int(coverage[1]),

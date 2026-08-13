@@ -14,6 +14,10 @@ from apps.api.app.models.entities import (
     SearchJob,
     new_id,
 )
+from apps.api.app.services.deep_models import (
+    CURATED_DEEP_SYNTHESIS_MODELS,
+    DEFAULT_DEEP_SYNTHESIS_MODEL,
+)
 from apps.api.app.services.grounded_synthesis_scheduling import (
     GROUNDED_SYNTHESIS_PROVIDER_ID,
     schedule_grounded_synthesis_if_ready,
@@ -26,7 +30,14 @@ def _factory():
     return build_session_factory(engine)
 
 
-def _add_job(factory, *, now: datetime, search_mode: str, run_status: str) -> str:
+def _add_job(
+    factory,
+    *,
+    now: datetime,
+    search_mode: str,
+    run_status: str,
+    synthesis_model: str | None = None,
+) -> str:
     job_id = new_id()
     attempt_id = new_id()
     with factory() as session, session.begin():
@@ -47,6 +58,7 @@ def _add_job(factory, *, now: datetime, search_mode: str, run_status: str) -> st
                 seed_identifier="octaviyao",
                 normalized_seed="instagram:handle:octaviyao",
                 search_mode=search_mode,
+                synthesis_model=synthesis_model,
                 catalog_profile="quick",
                 catalog_snapshot_id=None,
                 exploration_status="running",
@@ -245,6 +257,87 @@ def test_deep_mode_snapshots_openrouter_gateway_and_model():
         assert run.query_config["max_output_tokens"] == 16_000
         assert run.query_config["max_attempts"] == 3
         assert run.query_config["retry_backoff_seconds"] == 2
+
+
+def test_selected_curated_model_forces_openrouter_and_is_snapshotted_exactly():
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _factory()
+    selected_model = "openai/gpt-5.4-mini"
+    assert selected_model in CURATED_DEEP_SYNTHESIS_MODELS
+    job_id = _add_job(
+        factory,
+        now=now,
+        search_mode="deep",
+        run_status="success",
+        synthesis_model=selected_model,
+    )
+    settings = SimpleNamespace(
+        grounded_synthesis_enabled=True,
+        grounded_synthesis_provider="openai",
+        openai_api_key=SecretStr("unused-openai-key"),
+        openai_synthesis_model="gpt-5.6-sol",
+        openrouter_api_key=SecretStr("selected-model-openrouter-key"),
+    )
+
+    with factory() as session, session.begin():
+        job = session.get(SearchJob, job_id)
+        assert job is not None
+        assert schedule_grounded_synthesis_if_ready(
+            session,
+            job=job,
+            now=now,
+            settings=settings,
+        )
+
+    with factory() as session:
+        run = session.scalar(
+            select(ProviderRun).where(
+                ProviderRun.job_id == job_id,
+                ProviderRun.provider_id == GROUNDED_SYNTHESIS_PROVIDER_ID,
+            )
+        )
+        assert run is not None and run.status == "pending"
+        assert run.logical_run_id == "synthesis:openrouter:grounded:v2"
+        assert run.query_config["gateway"] == "openrouter"
+        assert run.query_config["model"] == selected_model
+
+
+def test_invalid_persisted_model_uses_curated_default_defensively():
+    now = datetime(2026, 7, 30, 12, 0, tzinfo=UTC)
+    factory = _factory()
+    job_id = _add_job(
+        factory,
+        now=now,
+        search_mode="deep",
+        run_status="success",
+        synthesis_model="untrusted/arbitrary-model",
+    )
+
+    with factory() as session, session.begin():
+        job = session.get(SearchJob, job_id)
+        assert job is not None
+        assert schedule_grounded_synthesis_if_ready(
+            session,
+            job=job,
+            now=now,
+            settings=SimpleNamespace(
+                grounded_synthesis_enabled=True,
+                grounded_synthesis_provider="openai",
+                openai_api_key=SecretStr("unused-openai-key"),
+                openrouter_api_key=SecretStr("defensive-default-openrouter-key"),
+            ),
+        )
+
+    with factory() as session:
+        run = session.scalar(
+            select(ProviderRun).where(
+                ProviderRun.job_id == job_id,
+                ProviderRun.provider_id == GROUNDED_SYNTHESIS_PROVIDER_ID,
+            )
+        )
+        assert run is not None and run.status == "pending"
+        assert run.query_config["gateway"] == "openrouter"
+        assert run.query_config["model"] == DEFAULT_DEEP_SYNTHESIS_MODEL
 
 
 def test_deep_mode_records_missing_openrouter_key():

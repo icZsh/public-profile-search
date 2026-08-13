@@ -41,6 +41,13 @@ PROFESSIONAL_PROVIDER_IDS = {
     EXA_PEOPLE_PROVIDER_ID,
     GITHUB_PROFESSIONAL_PROVIDER_ID,
 }
+_TERMINAL_JOB_STATES = {
+    "ready",
+    "ready_partial",
+    "no_candidates",
+    "failed",
+    "cancelled",
+}
 PROFESSIONAL_TERMINAL_STATES = {
     "success",
     "partial_success",
@@ -186,6 +193,8 @@ def schedule_professional_search_if_ready(
     prevents a second wave from being created by concurrent completion paths.
     """
 
+    if job.status in _TERMINAL_JOB_STATES:
+        return False
     if not bool(getattr(settings, "professional_search_enabled", False)):
         return False
     if job.job_kind != "footprint_discovery" or _deadline_reached(job.deadline_at, now):

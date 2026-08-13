@@ -11,6 +11,10 @@ from apps.api.app.models.entities import (
     SearchJob,
     new_id,
 )
+from apps.api.app.services.deep_models import (
+    DEFAULT_DEEP_SYNTHESIS_MODEL,
+    is_curated_deep_synthesis_model,
+)
 from apps.api.app.services.events import add_event
 
 GROUNDED_SYNTHESIS_PROVIDER_ID = "grounded_synthesis_v2"
@@ -39,6 +43,13 @@ _RETRIEVAL_TERMINAL_STATES = {
     *GROUNDED_SYNTHESIS_TERMINAL_STATES,
     "captcha_blocked",
 }
+_TERMINAL_JOB_STATES = {
+    "ready",
+    "ready_partial",
+    "no_candidates",
+    "failed",
+    "cancelled",
+}
 
 
 def schedule_grounded_synthesis_if_ready(
@@ -54,7 +65,11 @@ def schedule_grounded_synthesis_if_ready(
     immediately continue to the deterministic finalizer instead of hanging.
     """
 
-    if job.job_kind != "footprint_discovery" or job.search_mode != "deep":
+    if (
+        job.job_kind != "footprint_discovery"
+        or job.search_mode != "deep"
+        or job.status in _TERMINAL_JOB_STATES
+    ):
         return False
     session.flush()
     runs = session.scalars(
@@ -68,10 +83,20 @@ def schedule_grounded_synthesis_if_ready(
     if not runs or any(run.status not in _RETRIEVAL_TERMINAL_STATES for run in runs):
         return False
 
-    gateway = _synthesis_gateway(
-        getattr(settings, "grounded_synthesis_provider", "openai")
-    )
-    if gateway == "openrouter":
+    selected_model = job.synthesis_model
+    if selected_model is not None:
+        gateway = "openrouter"
+        model = (
+            selected_model
+            if is_curated_deep_synthesis_model(selected_model)
+            else DEFAULT_DEEP_SYNTHESIS_MODEL
+        )
+        key_present = _secret_present(getattr(settings, "openrouter_api_key", None))
+    else:
+        gateway = _synthesis_gateway(
+            getattr(settings, "grounded_synthesis_provider", "openai")
+        )
+    if selected_model is None and gateway == "openrouter":
         model = _bounded_text(
             getattr(
                 settings,
@@ -84,7 +109,7 @@ def schedule_grounded_synthesis_if_ready(
         key_present = _secret_present(
             getattr(settings, "openrouter_api_key", None)
         )
-    else:
+    elif selected_model is None:
         model = _bounded_text(
             getattr(settings, "openai_synthesis_model", "gpt-5.6-sol"),
             default="gpt-5.6-sol",

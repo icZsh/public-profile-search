@@ -8,6 +8,11 @@ import type {
   FootprintDeepTimelineEntry,
 } from "@public-profile-search/generated-api-client";
 
+import {
+  TraceFootprintBrief,
+  type TraceFootprintBriefProps,
+} from "@/components/TraceFootprintBrief";
+
 function words(value: string): string {
   return value.replaceAll("_", " ");
 }
@@ -293,7 +298,7 @@ function SubjectProfileSnapshot({
   );
 }
 
-export function FootprintBrief({
+export function LegacyFootprintBrief({
   brief,
   evidence,
 }: {
@@ -871,4 +876,8 @@ export function FootprintBrief({
       </div>
     </section>
   );
+}
+
+export function FootprintBrief(props: TraceFootprintBriefProps) {
+  return <TraceFootprintBrief {...props} />;
 }

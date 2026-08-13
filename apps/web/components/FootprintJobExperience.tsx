@@ -7,14 +7,18 @@ import type {
   FootprintDeepProgressPhase,
   FootprintJob,
   FootprintJobStatus,
+  FootprintSynthesisModel,
 } from "@public-profile-search/generated-api-client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { CandidateResults } from "@/components/CandidateResults";
 import { FootprintBrief } from "@/components/FootprintBrief";
 import {
   ApiError,
+  cancelFootprintJob,
+  createFootprintJob,
   getFootprintBrief,
   getFootprintCandidates,
   getFootprintEvidence,
@@ -130,6 +134,43 @@ function deepProgressDescription(phase: FootprintDeepProgressPhase): string {
   }
 }
 
+function discoveryPhaseTitle(
+  phase: FootprintDeepProgressPhase | null,
+  deepMode: boolean,
+): string {
+  if (!deepMode) return "Checking the public record";
+  switch (phase) {
+    case "queued":
+      return "Preparing the public scan";
+    case "account_scan":
+      return "Scanning public accounts";
+    case "professional_enrichment":
+      return "Expanding professional evidence";
+    case "report_generation":
+      return "Writing the evidence-backed story";
+    case "finalizing":
+      return "Checking every citation";
+    case "complete":
+      return "The brief is ready";
+    case "awaiting_anchor":
+      return "Waiting on one identity choice";
+    default:
+      return "Building the brief";
+  }
+}
+
+function visibleProgressLabel(index: number, deepMode: boolean): string {
+  if (!deepMode) {
+    return ["Account scan", "People search and cited answers"][index];
+  }
+  return [
+    "Account scan",
+    "Professional enrichment",
+    "Writing the story",
+    "Checking every citation",
+  ][index];
+}
+
 function readableStatus(status: FootprintJobStatus): string {
   const labels: Record<FootprintJobStatus, string> = {
     queued: "Queued",
@@ -174,6 +215,7 @@ function retryDelay(reason: unknown, attempt: number): number {
 }
 
 export function FootprintJobExperience({ jobId }: { jobId: string }) {
+  const router = useRouter();
   const [job, setJob] = useState<FootprintJob | null>(null);
   const [candidates, setCandidates] =
     useState<CandidateList>(emptyCandidates);
@@ -183,12 +225,15 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
   const [retrying, setRetrying] = useState(false);
   const [pollingStopped, setPollingStopped] = useState(false);
   const [error, setError] = useState("");
+  const [stopping, setStopping] = useState(false);
+  const [stopError, setStopError] = useState("");
   const [selectingCandidateId, setSelectingCandidateId] = useState<
     string | null
   >(null);
   const [anchorError, setAnchorError] = useState("");
   const [pollGeneration, setPollGeneration] = useState(0);
   const [elapsedNow, setElapsedNow] = useState(() => Date.now());
+  const [upgrading, setUpgrading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -242,6 +287,7 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
         const current = await getFootprintJob(jobId);
         if (!active) return;
         setJob(current);
+        if (terminalStatuses.has(current.status)) setStopError("");
         setPollingStopped(false);
 
         const nextCandidates = await getFootprintCandidates(jobId);
@@ -328,7 +374,7 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
   ]);
 
   async function chooseAnchor(candidateId: string) {
-    if (selectingCandidateId) return;
+    if (selectingCandidateId || stopping) return;
     setSelectingCandidateId(candidateId);
     setAnchorError("");
 
@@ -377,6 +423,55 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
     }
   }
 
+  async function stopSearch() {
+    if (!job || stopping || terminalStatuses.has(job.status)) return;
+    setStopping(true);
+    setStopError("");
+
+    try {
+      const stoppedJob = await cancelFootprintJob(jobId);
+      setJob(stoppedJob);
+      setPollingStopped(false);
+      setPollGeneration((generation) => generation + 1);
+    } catch (reason) {
+      setStopError(
+        reason instanceof Error
+          ? reason.message
+          : "The search could not be stopped. Please try again.",
+      );
+      setPollingStopped(false);
+      setPollGeneration((generation) => generation + 1);
+    } finally {
+      setStopping(false);
+    }
+  }
+
+  async function startDeepRun(model: FootprintSynthesisModel) {
+    if (!job || upgrading) return;
+    setUpgrading(true);
+    setError("");
+
+    try {
+      const nextJob = await createFootprintJob(
+        {
+          seed: job.seed,
+          search_mode: "deep",
+          synthesis_model: model,
+          locale: "en-US",
+        },
+        crypto.randomUUID(),
+      );
+      router.push(`/footprint/${nextJob.job_id}`);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The Deep brief could not be started. Please try again.",
+      );
+      setUpgrading(false);
+    }
+  }
+
   const coverage = job?.coverage;
   const completed = coverage?.completed ?? 0;
   const selected = coverage?.selected ?? 0;
@@ -391,12 +486,14 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
           ? "queued"
           : "account_scan"))
     : null;
+  const terminal = Boolean(job && terminalStatuses.has(job.status));
   const awaitingAnchor =
-    job?.exploration_status === "awaiting_anchor" ||
-    deepProgressPhase === "awaiting_anchor";
+    !terminal &&
+    (job?.exploration_status === "awaiting_anchor" ||
+      deepProgressPhase === "awaiting_anchor");
   const running =
     !awaitingAnchor &&
-    !pollingStopped && (!job || !terminalStatuses.has(job.status));
+    !pollingStopped && (!job || !terminal);
   const seedLabel = job
     ? job.seed.kind === "profile_url"
       ? job.seed.profile_url
@@ -431,262 +528,332 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
         elapsedNow,
       )
     : "0:00";
+  const progressPhase = deepProgressPhase ?? (terminal ? "complete" : "account_scan");
+  const liveSourceCount = candidates.items.reduce(
+    (total, candidate) => total + Math.max(1, candidate.evidence.length),
+    0,
+  );
+  const stepsToRender = deepMode ? deepProgressSteps : deepProgressSteps.slice(0, 2);
 
   return (
-    <main className="footprintShell">
-      <nav className="topbar">
-        <Link className="brand" href="/">
-          tracebrief<span className="brandMark">/</span>
-        </Link>
-        <span className="prototypePill">Discovery {jobId.slice(0, 8)}</span>
-      </nav>
-
-      <header className="discoveryHeader">
-        <div>
-          <div className="eyebrow">Public account discovery</div>
-          <h1>{seedLabel}</h1>
-          <p>
-            {job?.status === "failed"
-              ? "Discovery stopped before the report could be completed. Any candidates already found remain available below."
-              : job?.status === "cancelled"
-                ? "Discovery was cancelled. Any candidates already found remain available below."
-                : deepMode && deepProgressPhase
-                  ? deepProgressDescription(deepProgressPhase)
-                  : awaitingAnchor
-                    ? "The handle produced competing public name signals. Choose the profile you recognize below so discovery can prioritize the next search."
-                    : "Adaptive account and professional discovery is running within a bounded budget. Candidate accounts appear below as scan shards complete."}
-          </p>
-        </div>
-        <div
-          className={`discoveryStatus ${running ? "discoveryStatusRunning" : ""}`}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <span aria-hidden="true">
-            {job?.status === "failed"
-              ? "!"
-              : job?.status === "cancelled"
-                ? "×"
-                : awaitingAnchor
-                  ? "?"
-                  : running
-                    ? <i className="scanPulse" />
-                    : "✓"}
+    <main className="traceApp traceJob">
+      <nav className={`traceTopbar ${brief ? "traceTopbarBrief" : ""}`}>
+        <div className="traceTopbarIdentity">
+          <Link className="traceBrand" href="/">
+            tracebrief<span className="brandMark">/</span>
+          </Link>
+          <span>
+            {seedLabel}
+            {job ? ` · ${deepMode ? "deep" : "quick"}` : ""}
+            {awaitingAnchor ? " · paused" : ""}
+            {brief ? ` · ${evidence.length} sources` : ""}
           </span>
-          {currentStatusLabel}
         </div>
-      </header>
 
-      {deepMode && deepProgressPhase ? (
-        <section
-          className={`deepProgressCard ${awaitingAnchor ? "deepProgressCardPaused" : ""}`}
-          aria-label="Deep report progress"
-        >
-          <div className="deepProgressHeading">
+        <div className="traceTopbarActions">
+          <details className="traceOperatorDisclosure">
+            <summary>Operator view</summary>
             <div>
-              <span>Deep workflow</span>
-              <strong>{deepProgressStatusLabels[deepProgressPhase]}</strong>
-            </div>
-            <div className="deepProgressTiming">
-              {deepProgressComplete ? (
+              <strong>Discovery {jobId.slice(0, 8)}</strong>
+              <span>{job ? `${job.catalog.engine} ${job.catalog.package_version ?? ""}` : "Connecting"}</span>
+              <span>{searchModeLabel} mode · Adaptive discovery catalog</span>
+              {job ? <span>Started {formattedDate(job.accepted_at)}</span> : null}
+              {job ? <span>Retrieval cutoff {formattedDate(job.deadline_at)}</span> : null}
+              {deepProgressComplete && job?.deep_progress?.finished_at ? (
                 <>
-                  <span className="deepProgressTimingComplete">
-                    Status <strong>✓ Complete</strong>
-                  </span>
-                  <span>
-                    Completed in <strong>{deepTotalElapsed}</strong>
-                  </span>
+                  <span>Status <strong>✓ Complete</strong></span>
+                  <span>Completed in <strong>{deepTotalElapsed}</strong></span>
+                  <span>Completed {formattedDate(job.deep_progress.finished_at)}</span>
                 </>
               ) : (
-                <span>
-                  {deepProgressStopped ? "Stopped after" : "Elapsed"}{" "}
-                  <strong>{deepTotalElapsed}</strong>
-                </span>
+                <span>Current stage <strong>{deepStageElapsed}</strong></span>
               )}
-              {!deepProgressComplete && !deepProgressStopped ? (
-                <span>
-                  {deepProgressPhase === "queued" ? "Queued" : "Current stage"}{" "}
-                  <strong>{deepStageElapsed}</strong>
-                </span>
-              ) : null}
             </div>
-          </div>
+          </details>
 
-          {awaitingAnchor ? (
-            <p className="deepProgressPauseNotice">
-              <strong>Progress paused</strong>
-              Choose a starting profile below to continue professional enrichment.
-            </p>
+          {brief ? (
+            <>
+              <Link className="traceSecondaryButton" href="/">
+                Re-run
+              </Link>
+              <button
+                className="tracePrimaryButton traceTopbarPrimary"
+                type="button"
+                onClick={() => window.print()}
+              >
+                Export
+              </button>
+            </>
           ) : null}
 
-          <ol className="deepProgressSteps">
-            {deepProgressSteps.map((step, index) => {
-              const state = deepProgressStepState(
-                deepProgressPhase,
-                index,
-                deepProgressStopped,
-              );
-              const paused = awaitingAnchor && index === 1;
-              const statusLabel = paused
-                ? "Waiting for selection"
-                : state === "complete"
-                  ? "Complete"
-                  : state === "running"
-                    ? "In progress"
-                    : state === "stopped"
-                      ? job?.status === "failed"
-                        ? "Stopped after failure"
-                        : "Cancelled"
-                      : "Upcoming";
-
-              return (
-                <li
-                  className={`deepProgressStep deepProgressStep-${state} ${paused ? "deepProgressStep-paused" : ""}`}
-                  key={step.phase}
-                  aria-current={state === "running" ? "step" : undefined}
-                >
-                  <div className="deepProgressStepTopline">
-                    <span className="deepProgressStepNumber" aria-hidden="true">
-                      {state === "complete" ? "✓" : index + 1}
-                    </span>
-                    <span className="deepProgressStepStatus">{statusLabel}</span>
-                  </div>
-                  <strong>{step.label}</strong>
-                  {index === 0 ? (
-                    <small>
-                      {completed} / {selected || "—"} sites checked
-                    </small>
-                  ) : (
-                    <small>
-                      {state === "running"
-                        ? `Stage elapsed ${deepStageElapsed}`
-                        : "Evidence-grounded workflow"}
-                    </small>
-                  )}
-                  <span className="deepProgressStepTrack" aria-hidden="true" />
-                </li>
-              );
-            })}
-          </ol>
-
-          {job ? (
-            <div className="catalogMeta">
-              <span>{searchModeLabel} mode</span>
-              <span>Started {formattedDate(job.accepted_at)}</span>
-              {deepProgressComplete && job.deep_progress?.finished_at ? (
-                <span>
-                  Completed {formattedDate(job.deep_progress.finished_at)}
-                </span>
-              ) : (
-                <span>
-                  Current phase {deepProgressPhase.replaceAll("_", " ")}
-                </span>
-              )}
-              <span>Retrieval cutoff {formattedDate(job.deadline_at)}</span>
-            </div>
+          {job && !terminal ? (
+            <button
+              className="stopSearchButton"
+              type="button"
+              onClick={stopSearch}
+              disabled={stopping || selectingCandidateId !== null}
+              aria-busy={stopping}
+            >
+              {stopping ? "Stopping…" : "Stop search"}
+            </button>
           ) : null}
-        </section>
-      ) : (
-      <section className="coverageCard" aria-label="Catalog scan coverage">
-        <div className="coverageHeading">
-          <div>
-            <span>Catalog coverage</span>
-            <strong>
-              {completed} / {selected || "—"} sites checked
-            </strong>
-          </div>
-          <span>{progress}%</span>
         </div>
-        <div
-          className="coverageTrack"
-          role="progressbar"
-          aria-label="Sites checked"
-          aria-valuemin={0}
-          aria-valuemax={selected || 100}
-          aria-valuenow={completed}
-        >
-          <span style={{ width: `${progress}%` }} />
-        </div>
-        <dl className="coverageStats">
-          <div>
-            <dt>Claimed</dt>
-            <dd>{coverage?.claimed ?? 0}</dd>
-          </div>
-          <div>
-            <dt>Available</dt>
-            <dd>{coverage?.available ?? 0}</dd>
-          </div>
-          <div>
-            <dt>Unknown</dt>
-            <dd>{coverage?.unknown ?? 0}</dd>
-          </div>
-          <div>
-            <dt>Invalid</dt>
-            <dd>{coverage?.illegal ?? 0}</dd>
-          </div>
-        </dl>
-        {job ? (
-          <div className="catalogMeta">
-            <span>
-              {job.catalog.engine}
-              {job.catalog.package_version
-                ? ` ${job.catalog.package_version}`
-                : ""}
-            </span>
-            <span>{searchModeLabel} mode</span>
-            <span>Adaptive discovery catalog</span>
-            <span>Retrieval cutoff {formattedDate(job.deadline_at)}</span>
-          </div>
-        ) : null}
-      </section>
-      )}
+      </nav>
+
+      <div
+        className="traceSrOnly"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {currentStatusLabel}
+      </div>
+
+      {stopError ? (
+        <p className="stopSearchError traceInlineError" role="alert">
+          {stopError}
+        </p>
+      ) : null}
 
       {error ? (
-        <p className="refreshNotice" role={retrying ? "status" : "alert"}>
+        <p className="refreshNotice traceInlineError" role={retrying ? "status" : "alert"}>
           {error}
           {retrying ? " Retrying automatically." : ""}
         </p>
       ) : null}
 
       {job?.status === "ready_partial" ? (
-        <p className="partialNotice">
-          Some sites could not be checked. The candidates below come only from
-          completed checks.
-        </p>
-      ) : null}
-      {job?.status === "failed" ? (
-        <p className="formError">
-          The scan could not finish. Any candidates already shown remain inspectable.
+        <p className="partialNotice traceInlineNotice">
+          Some sites could not be checked. The report uses only completed checks.
         </p>
       ) : null}
 
       {briefPending && !brief ? (
-        <p className="briefPendingNotice" role="status">
+        <p className="briefPendingNotice traceInlineNotice" role="status">
           {deepMode
             ? "The Deep story is complete. Loading its evidence-linked report…"
             : "Discovery is complete. Preparing the evidence-linked footprint brief…"}
         </p>
       ) : null}
 
-      {brief ? <FootprintBrief brief={brief} evidence={evidence} /> : null}
-
-      {!brief && (job || !pollingStopped) ? (
-        <CandidateResults
-          candidates={candidates}
-          running={running}
-          awaitingAnchor={awaitingAnchor}
-          selectingCandidateId={selectingCandidateId}
-          anchorError={anchorError}
-          onSelectAnchor={chooseAnchor}
-        />
+      {brief ? (
+        <>
+          <FootprintBrief
+            brief={brief}
+            evidence={evidence}
+            coverage={coverage}
+            seedLabel={seedLabel}
+            searchMode={job?.search_mode}
+            onRunDeep={deepMode ? undefined : startDeepRun}
+            upgrading={upgrading}
+          />
+          <footer className="traceJobFooter">
+            <div>
+              <strong>Finished with this brief?</strong>
+              <span>Begin a separate search with another public identifier.</span>
+            </div>
+            <Link className="tracePrimaryButton" href="/">
+              Start another search
+            </Link>
+          </footer>
+        </>
       ) : null}
 
-      <div className="footprintActions">
-        <Link className="textLink" href="/">
-          ← Search another identifier
-        </Link>
-      </div>
+      {!brief && (job || !pollingStopped) ? (
+        awaitingAnchor ? (
+          <section className="traceCheckpointPage">
+            <p className="traceSrOnly">
+              <strong>Progress paused</strong> Choose a starting profile to continue.
+            </p>
+            <CandidateResults
+              candidates={candidates}
+              running={running}
+              stopped={job?.status === "cancelled"}
+              awaitingAnchor={awaitingAnchor}
+              selectingCandidateId={stopping ? "search-stopping" : selectingCandidateId}
+              anchorError={anchorError}
+              onSelectAnchor={chooseAnchor}
+            />
+          </section>
+        ) : (
+          <section className="traceRunningPage">
+            <div className="traceRunningGrid">
+              <div className="traceRunningMain">
+                <header className="traceRunningHeader">
+                  <div className="traceRunningStatus">
+                    <i className={running ? "scanPulse" : "scanPulse scanPulseDone"} />
+                    <span>
+                      {deepProgressStopped && job
+                        ? readableStatus(job.status)
+                        : running
+                          ? "Building the brief"
+                          : currentStatusLabel}
+                    </span>
+                  </div>
+                  <h1>{discoveryPhaseTitle(deepProgressPhase, deepMode)}</h1>
+                  <div className="traceRunningIntro">
+                    <p>
+                      {job?.status === "failed"
+                        ? "Discovery stopped before the report could be completed. Candidates already found remain below."
+                        : job?.status === "cancelled"
+                          ? "Discovery was cancelled. Candidates already found remain below."
+                          : deepMode && deepProgressPhase
+                            ? deepProgressDescription(deepProgressPhase)
+                            : "Public accounts are being checked, followed by a bounded people search and cited answers."}
+                    </p>
+                    <div className="traceTimer" aria-label={`Elapsed ${deepTotalElapsed}`}>
+                      <strong>{deepTotalElapsed}</strong>
+                      <span>Elapsed · stage {deepStageElapsed}</span>
+                    </div>
+                  </div>
+                </header>
+
+                <ol className="traceProgressList deepProgressSteps" aria-label="Brief progress">
+                  {stepsToRender.map((step, index) => {
+                    const state = deepProgressStepState(
+                      progressPhase,
+                      index,
+                      Boolean(deepProgressStopped),
+                    );
+                    const paused = awaitingAnchor && index === 1;
+                    const stepProgress =
+                      state === "complete"
+                        ? 100
+                        : state === "running" && index === 0 && selected > 0
+                          ? progress
+                          : null;
+                    const stepStatusLabel =
+                      state === "complete"
+                        ? "Complete"
+                        : state === "running"
+                          ? "Running"
+                          : state === "stopped"
+                            ? "Stopped"
+                            : "Waiting";
+                    return (
+                      <li
+                        className={`traceProgressStep deepProgressStep-${state} ${paused ? "deepProgressStep-paused" : ""}`}
+                        key={step.phase}
+                        aria-current={state === "running" ? "step" : undefined}
+                      >
+                        <div>
+                          <strong>{visibleProgressLabel(index, deepMode)}</strong>
+                          <small>
+                            {index === 0
+                              ? `${completed} of ${selected || "—"} sites checked · ${candidates.items.length} candidates kept`
+                              : state === "running"
+                                ? `Stage elapsed ${deepStageElapsed}`
+                            : "Written only from retrieved public sources"}
+                          </small>
+                        </div>
+                        <span
+                          className={`traceStepStatusRing traceStepStatusRing-${state}`}
+                          aria-hidden="true"
+                        >
+                          <svg
+                            className="traceStepProgressRing"
+                            viewBox="0 0 28 28"
+                            focusable="false"
+                          >
+                            <circle
+                              className="traceStepProgressRingTrack"
+                              cx="14"
+                              cy="14"
+                              r="12"
+                              pathLength="100"
+                            />
+                            {state === "running" || state === "complete" ? (
+                              <circle
+                                className={`traceStepProgressRingValue ${state === "running" && stepProgress === null ? "traceStepProgressRingIndeterminate" : ""}`}
+                                cx="14"
+                                cy="14"
+                                r="12"
+                                pathLength="100"
+                                style={
+                                  stepProgress === null
+                                    ? undefined
+                                    : { strokeDashoffset: 100 - stepProgress }
+                                }
+                              />
+                            ) : null}
+                          </svg>
+                          {state === "complete" ? (
+                            <svg
+                              className="traceStepCompleteCheck"
+                              viewBox="0 0 20 20"
+                              focusable="false"
+                            >
+                              <path d="M4.5 10.5 8.25 14.25 15.75 6.75" />
+                            </svg>
+                          ) : null}
+                        </span>
+                        <span className="traceSrOnly">{stepStatusLabel}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+
+                <CandidateResults
+                  candidates={candidates}
+                  running={running}
+                  stopped={job?.status === "cancelled"}
+                  awaitingAnchor={false}
+                  selectingCandidateId={stopping ? "search-stopping" : selectingCandidateId}
+                  anchorError={anchorError}
+                  onSelectAnchor={chooseAnchor}
+                />
+              </div>
+
+              <aside className="traceLiveSidebar" aria-label="Discovery coverage">
+                <section>
+                  <div className="traceSidebarHeading">Public signals collected</div>
+                  <div className="traceSidebarCount">
+                    <strong>{liveSourceCount}</strong>
+                    <span>so far</span>
+                  </div>
+                  <div className="traceLiveSources">
+                    {candidates.items.slice(0, 6).map((candidate, index) => (
+                      <div key={candidate.candidate_id}>
+                        <span>{index + 1}</span>
+                        <strong>{candidate.platform} profile</strong>
+                        <small>{candidate.is_similar ? "similar" : "exact"}</small>
+                      </div>
+                    ))}
+                    {!candidates.items.length ? (
+                      <p>Candidate sources will appear as catalog checks finish.</p>
+                    ) : null}
+                  </div>
+                </section>
+
+                <section className="traceCoveragePanel">
+                  <div className="traceSidebarHeading">Coverage</div>
+                  <div
+                    className="traceCoverageTrack"
+                    role="progressbar"
+                    aria-label="Sites checked"
+                    aria-valuemin={0}
+                    aria-valuemax={selected || 100}
+                    aria-valuenow={completed}
+                  >
+                    <span style={{ width: `${progress}%` }} />
+                  </div>
+                  <dl>
+                    <div><dd>{coverage?.claimed ?? 0}</dd><dt>Claimed</dt></div>
+                    <div><dd>{coverage?.available ?? 0}</dd><dt>Available</dt></div>
+                    <div><dd>{coverage?.unknown ?? 0}</dd><dt>Unknown</dt></div>
+                    <div><dd>{coverage?.illegal ?? 0}</dd><dt>Invalid</dt></div>
+                  </dl>
+                  <p>
+                    Unknown and invalid checks stay outside the brief unless later
+                    public evidence resolves them.
+                  </p>
+                </section>
+              </aside>
+            </div>
+          </section>
+        )
+      ) : null}
+
     </main>
   );
 }
