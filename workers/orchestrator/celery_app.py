@@ -22,6 +22,14 @@ celery_app.conf.update(
     task_ignore_result=True,
     worker_prefetch_multiplier=1,
     task_default_queue="fast_http",
+    # Redis reverses Celery's numeric priority scale: 0 is highest, 9 lowest.
+    task_default_priority=9,
+    task_queue_max_priority=9,
+    broker_transport_options={
+        "priority_steps": list(range(10)),
+        "sep": ":",
+        "queue_order_strategy": "priority",
+    },
     task_routes={
         "prototype.process_provider_run": {"queue": "fast_http"},
         "prototype.process_maigret_scan_run": {"queue": "maigret_scan"},

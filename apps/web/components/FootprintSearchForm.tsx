@@ -6,45 +6,22 @@ import type {
   FootprintSeed,
   FootprintSynthesisModel,
 } from "@public-profile-search/generated-api-client";
+import { MagnifyingGlassIcon, SparkleIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useRef, useState } from "react";
+import {
+  type FocusEvent,
+  type FormEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-import { createFootprintJob } from "@/lib/api";
+import { createFootprintJob, createIdempotencyKey } from "@/lib/api";
 import {
   DEFAULT_SYNTHESIS_MODEL,
   SYNTHESIS_MODEL_OPTIONS,
 } from "@/lib/synthesis-models";
-
-const searchModeOptions: {
-  value: FootprintSearchMode;
-  label: string;
-  eyebrow: string;
-  description: string;
-  time: string;
-  features: string[];
-  unavailable: string[];
-}[] = [
-  {
-    value: "quick",
-    label: "Quick",
-    eyebrow: "Focused retrieval",
-    description:
-      "20 sites and a short people search. You get the account cluster and what the evidence directly supports.",
-    time: "about 1 minute",
-    features: ["Accounts", "Cited answers"],
-    unavailable: ["No narrative", "No timeline"],
-  },
-  {
-    value: "deep",
-    label: "Deep",
-    eyebrow: "Expanded retrieval + story",
-    description:
-      "A broader 56-site scan and full professional search, followed by a source-grounded story.",
-    time: "varies by model",
-    features: ["Accounts", "Cited answers", "Narrative", "Timeline"],
-    unavailable: [],
-  },
-];
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error
@@ -56,6 +33,14 @@ function isHttpProfileUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
+function hasFineHoverPointer(pointerType: string): boolean {
+  if (pointerType !== "mouse") return false;
+  return (
+    typeof window.matchMedia !== "function" ||
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches
+  );
+}
+
 export function FootprintSearchForm() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
@@ -64,14 +49,95 @@ export function FootprintSearchForm() {
     useState<FootprintSynthesisModel>(DEFAULT_SYNTHESIS_MODEL);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const selectedSynthesisOption =
-    SYNTHESIS_MODEL_OPTIONS.find(
-      (option) => option.value === synthesisModel,
-    ) ?? SYNTHESIS_MODEL_OPTIONS[0];
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const modeControlRef = useRef<HTMLDivElement>(null);
+  const tooltipCloseTimer = useRef<number | null>(null);
+  const pointerFocusType = useRef<string | null>(null);
+  const focusKeepsTooltipOpen = useRef(false);
   const creationAttempt = useRef<{
     payloadSignature: string;
     idempotencyKey: string;
   } | null>(null);
+
+  function cancelTooltipClose() {
+    if (tooltipCloseTimer.current !== null) {
+      window.clearTimeout(tooltipCloseTimer.current);
+      tooltipCloseTimer.current = null;
+    }
+  }
+
+  function dismissTooltip() {
+    cancelTooltipClose();
+    setTooltipOpen(false);
+  }
+
+  function handleModePointerEnter(event: PointerEvent<HTMLDivElement>) {
+    if (!hasFineHoverPointer(event.pointerType)) return;
+    cancelTooltipClose();
+    setTooltipOpen(true);
+  }
+
+  function handleModePointerLeave(event: PointerEvent<HTMLDivElement>) {
+    if (!hasFineHoverPointer(event.pointerType)) return;
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+    cancelTooltipClose();
+    tooltipCloseTimer.current = window.setTimeout(() => {
+      tooltipCloseTimer.current = null;
+      if (!focusKeepsTooltipOpen.current) {
+        setTooltipOpen(false);
+      }
+    }, 160);
+  }
+
+  function handleModePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    pointerFocusType.current = event.pointerType;
+    focusKeepsTooltipOpen.current = false;
+    if (event.pointerType !== "mouse") dismissTooltip();
+  }
+
+  function handleModeFocus() {
+    const pointerType = pointerFocusType.current;
+    pointerFocusType.current = null;
+    if (pointerType !== null) return;
+    focusKeepsTooltipOpen.current = true;
+    cancelTooltipClose();
+    setTooltipOpen(true);
+  }
+
+  function handleModeBlur(event: FocusEvent<HTMLButtonElement>) {
+    if (
+      event.relatedTarget instanceof Node &&
+      modeControlRef.current?.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+    focusKeepsTooltipOpen.current = false;
+    dismissTooltip();
+  }
+
+  useEffect(() => {
+    return () => cancelTooltipClose();
+  }, []);
+
+  useEffect(() => {
+    if (!tooltipOpen) return;
+    function dismissOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (tooltipCloseTimer.current !== null) {
+        window.clearTimeout(tooltipCloseTimer.current);
+        tooltipCloseTimer.current = null;
+      }
+      focusKeepsTooltipOpen.current = false;
+      setTooltipOpen(false);
+    }
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => document.removeEventListener("keydown", dismissOnEscape);
+  }, [tooltipOpen]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,6 +172,7 @@ export function FootprintSearchForm() {
       seed,
       search_mode: searchMode,
       locale: "en-US",
+      history_policy: "prefer_existing",
       ...(searchMode === "deep"
         ? { synthesis_model: synthesisModel }
         : {}),
@@ -114,7 +181,7 @@ export function FootprintSearchForm() {
     if (creationAttempt.current?.payloadSignature !== payloadSignature) {
       creationAttempt.current = {
         payloadSignature,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: createIdempotencyKey(),
       };
     }
     try {
@@ -131,8 +198,17 @@ export function FootprintSearchForm() {
   }
 
   return (
-    <form className="traceSearchCard" onSubmit={submit}>
-      <div className="traceSearchInputRow">
+    <form
+      className="traceSearchCard"
+      onSubmit={submit}
+      role="search"
+      aria-label="Public footprint search"
+    >
+      <div
+        className={`traceUnifiedSearch ${
+          searchMode === "deep" ? "traceUnifiedSearchDeep" : ""
+        }`}
+      >
         <label className="traceSrOnly" htmlFor="seed-identifier">
           Handle or public profile URL
         </label>
@@ -150,73 +226,12 @@ export function FootprintSearchForm() {
           required
           disabled={busy}
         />
-        <button className="tracePrimaryButton" type="submit" disabled={busy}>
-          {busy ? "Starting brief…" : "Build the brief"}
-        </button>
-      </div>
 
-      <fieldset className="traceModePicker" disabled={busy}>
-        <legend>Search depth</legend>
-        <div className="traceModeOptions">
-          {searchModeOptions.map((option) => (
-            <label
-              className={`traceModeOption ${
-                searchMode === option.value ? "traceModeOptionSelected" : ""
-              }`}
-              key={option.value}
-              onClick={() => setSearchMode(option.value)}
-            >
-              <input
-                type="radio"
-                name="search_mode"
-                value={option.value}
-                checked={searchMode === option.value}
-                onChange={() => setSearchMode(option.value)}
-              />
-              <span className="traceModeOptionBody">
-                <span className="traceModeOptionHeading">
-                  <strong>
-                    {option.label}
-                    {searchMode === option.value ? (
-                      <small className="traceSelectedBadge">Selected</small>
-                    ) : null}
-                  </strong>
-                  <small>{option.time}</small>
-                </span>
-                <span className="traceSrOnly">{option.eyebrow}. </span>
-                <span className="traceModeOptionDescription">{option.description}</span>
-                <span className="traceModeFeatures" aria-hidden="true">
-                  {option.features.map((feature) => (
-                    <span
-                      className={
-                        feature === "Narrative" || feature === "Timeline"
-                          ? "traceModeFeature traceModeFeatureAccent"
-                          : "traceModeFeature"
-                      }
-                      key={feature}
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                  {option.unavailable.map((feature) => (
-                    <span className="traceModeFeature traceModeFeatureUnavailable" key={feature}>
-                      {feature}
-                    </span>
-                  ))}
-                </span>
-              </span>
+        {searchMode === "deep" ? (
+          <div className="traceInlineModelPicker">
+            <label className="traceSrOnly" htmlFor="synthesis-model">
+              Deep story model
             </label>
-          ))}
-        </div>
-      </fieldset>
-
-      {searchMode === "deep" ? (
-        <div className="traceModelPicker">
-          <label className="traceModelPickerLabel" htmlFor="synthesis-model">
-            <strong>Story model</strong>
-            <span>Choose how the source-grounded story is composed.</span>
-          </label>
-          <div className="traceModelControl">
             <select
               id="synthesis-model"
               name="synthesis_model"
@@ -225,7 +240,6 @@ export function FootprintSearchForm() {
                 setSynthesisModel(event.target.value as FootprintSynthesisModel)
               }
               disabled={busy}
-              aria-describedby="synthesis-model-note"
             >
               {SYNTHESIS_MODEL_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -233,17 +247,75 @@ export function FootprintSearchForm() {
                 </option>
               ))}
             </select>
-            <p className="traceModelSummary" id="synthesis-model-note">
-              <span>
-                <strong>{selectedSynthesisOption.speedLabel}</strong>
-                {selectedSynthesisOption.inputPrice} input ·{" "}
-                {selectedSynthesisOption.outputPrice} output per 1M tokens
-              </span>
-              <small>Prices and relative latency estimates can change.</small>
-            </p>
+          </div>
+        ) : null}
+
+        <div
+          className="traceDeepModeControl"
+          ref={modeControlRef}
+          onPointerEnter={handleModePointerEnter}
+          onPointerLeave={handleModePointerLeave}
+        >
+          <button
+            className="traceDeepModeToggle"
+            type="button"
+            onClick={() =>
+              setSearchMode((current) => current === "deep" ? "quick" : "deep")
+            }
+            onPointerDown={handleModePointerDown}
+            onFocus={handleModeFocus}
+            onBlur={handleModeBlur}
+            disabled={busy}
+            aria-label="Deep search mode"
+            aria-pressed={searchMode === "deep"}
+            aria-describedby="search-depth-tooltip"
+          >
+            <SparkleIcon aria-hidden="true" size={17} weight="fill" />
+            <span>Deep</span>
+          </button>
+          <div
+            className={`traceSearchModeTooltip ${
+              tooltipOpen ? "traceSearchModeTooltipOpen" : ""
+            }`}
+            id="search-depth-tooltip"
+            role="tooltip"
+            aria-hidden={!tooltipOpen}
+          >
+            <span>
+              <strong>Quick</strong>
+              Focused account and people search with cited answers.
+            </span>
+            <span>
+              <strong>Deep</strong>
+              Broader account and professional search with a cited narrative and timeline.
+            </span>
           </div>
         </div>
-      ) : null}
+
+        <button
+          className="tracePrimaryButton traceSearchSubmit"
+          type="submit"
+          disabled={busy}
+          aria-label={busy ? "Starting the brief" : "Build the brief"}
+        >
+          {busy ? (
+            <span className="traceSearchBusySpinner" aria-hidden="true" />
+          ) : (
+            <MagnifyingGlassIcon aria-hidden="true" size={16} weight="bold" />
+          )}
+        </button>
+      </div>
+
+      <input type="hidden" name="search_mode" value={searchMode} />
+
+      <p
+        className="traceSrOnly"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {busy ? "Starting the brief." : ""}
+      </p>
 
       {error ? (
         <p className="traceFormError" role="alert">

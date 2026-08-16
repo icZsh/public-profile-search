@@ -7,7 +7,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from apps.api.app.core.crypto import (
@@ -21,13 +21,17 @@ from apps.api.app.core.crypto import (
 )
 from apps.api.app.core.errors import ApiError
 from apps.api.app.models.entities import (
+    AccountNode,
     IdempotencyRecord,
     JobAttempt,
     JobEvent,
     MaigretCatalogSnapshot,
     MaigretScanRun,
+    MaigretSiteCheck,
     OutboxMessage,
     ProviderRun,
+    ReportAccessState,
+    ReportRevision,
     SearchJob,
     new_id,
 )
@@ -64,6 +68,24 @@ _UNSUCCESSFUL_FOOTPRINT_JOB_STATUSES = {
     "failed",
     "cancelled",
 }
+_ACTIVE_FOOTPRINT_JOB_STATUSES = {
+    "queued",
+    "discovering",
+}
+_REOPENABLE_FOOTPRINT_JOB_STATUSES = (
+    _ACTIVE_FOOTPRINT_JOB_STATUSES | _SUCCESSFUL_FOOTPRINT_JOB_STATUSES
+)
+HISTORY_REUSE_POLICY = "planner_hints_revalidated_v1"
+
+
+def _expired(expires_at, now) -> bool:
+    comparison_expiry = expires_at
+    comparison_now = now
+    if comparison_expiry.tzinfo is None and comparison_now.tzinfo is not None:
+        comparison_expiry = comparison_expiry.replace(tzinfo=comparison_now.tzinfo)
+    if comparison_now.tzinfo is None and comparison_expiry.tzinfo is not None:
+        comparison_now = comparison_now.replace(tzinfo=comparison_expiry.tzinfo)
+    return comparison_expiry <= comparison_now
 
 
 @dataclass(frozen=True)
@@ -349,12 +371,151 @@ def _prioritize_sites_for_seed(
     return prioritized + tuple(site for site in site_names if site not in priority)
 
 
+def _has_active_report(session: Session, *, job: SearchJob) -> bool:
+    attempt = session.get(JobAttempt, job.active_attempt_id)
+    if not attempt or not attempt.current_report_revision_id:
+        return False
+    report = session.get(ReportRevision, attempt.current_report_revision_id)
+    if (
+        report is None
+        or report.job_id != job.id
+        or report.status != "ready"
+        or report.report_type not in {"account_centric", "person_centric"}
+    ):
+        return False
+    access = session.get(ReportAccessState, attempt.current_report_revision_id)
+    return bool(access and access.job_id == job.id and access.state == "active")
+
+
+def _latest_compatible_history_job(
+    session: Session,
+    *,
+    user_id: str,
+    normalized_identifier_hmac: str,
+    search_mode: str,
+    synthesis_model: str | None,
+    locale: str,
+    now,
+    report_reads_enabled: bool,
+) -> SearchJob | None:
+    """Return an active run or an accessible saved result with exact settings."""
+
+    jobs = session.scalars(
+        select(SearchJob)
+        .where(
+            SearchJob.user_id == user_id,
+            SearchJob.job_kind == "footprint_discovery",
+            SearchJob.normalized_identifier_hmac == normalized_identifier_hmac,
+            SearchJob.search_mode == search_mode,
+            SearchJob.synthesis_model == synthesis_model,
+            SearchJob.locale == locale,
+            SearchJob.expires_at > now,
+            SearchJob.status.in_(_REOPENABLE_FOOTPRINT_JOB_STATUSES),
+        )
+        .order_by(SearchJob.accepted_at.desc(), SearchJob.id.desc())
+        .with_for_update()
+    ).all()
+    for job in jobs:
+        if job.status in _ACTIVE_FOOTPRINT_JOB_STATUSES:
+            return job
+        if report_reads_enabled and _has_active_report(session, job=job):
+            return job
+    return None
+
+
+def _lock_compatible_history_key(
+    session: Session,
+    *,
+    user_id: str,
+    normalized_identifier_hmac: str,
+    search_mode: str,
+    synthesis_model: str | None,
+    locale: str,
+) -> None:
+    """Serialize same-settings prefer-existing decisions on PostgreSQL."""
+
+    if session.get_bind().dialect.name != "postgresql":
+        return
+    digest = stable_payload_hash(
+        {
+            "user_id": user_id,
+            "seed_hmac": normalized_identifier_hmac,
+            "search_mode": search_mode,
+            "synthesis_model": synthesis_model,
+            "locale": locale,
+        }
+    )
+    lock_key = int(digest[:16], 16)
+    if lock_key >= 2**63:
+        lock_key -= 2**64
+    session.execute(select(func.pg_advisory_xact_lock(lock_key)))
+
+
+def _eligible_history_hint_source(
+    session: Session,
+    *,
+    source_job_id: str | None,
+    user_id: str,
+    normalized_identifier_hmac: str,
+    now,
+    report_reads_enabled: bool,
+) -> SearchJob | None:
+    if not source_job_id or not report_reads_enabled:
+        return None
+    source = session.get(SearchJob, source_job_id)
+    if (
+        source is None
+        or source.user_id != user_id
+        or source.job_kind != "footprint_discovery"
+        or source.normalized_identifier_hmac != normalized_identifier_hmac
+        or _expired(source.expires_at, now)
+        or source.status not in {"ready", "ready_partial"}
+        or not _has_active_report(session, job=source)
+    ):
+        return None
+    candidate_count = session.scalar(
+        select(func.count(AccountNode.id)).where(AccountNode.job_id == source.id)
+    )
+    if not candidate_count:
+        return None
+    return source
+
+
+def _history_prioritized_sites(
+    session: Session,
+    *,
+    source_job: SearchJob | None,
+    selected_sites: tuple[str, ...],
+) -> tuple[tuple[str, ...], int]:
+    """Move previously positive current-catalog sites first without copying evidence."""
+
+    if source_job is None:
+        return selected_sites, 0
+    positive_names = {
+        str(site_name).casefold()
+        for site_name in session.scalars(
+            select(MaigretSiteCheck.site_name)
+            .where(
+                MaigretSiteCheck.job_id == source_job.id,
+                MaigretSiteCheck.normalized_status == "found",
+            )
+            .distinct()
+        ).all()
+    }
+    prioritized = tuple(site for site in selected_sites if site.casefold() in positive_names)
+    if not prioritized:
+        return selected_sites, 0
+    remaining = tuple(site for site in selected_sites if site.casefold() not in positive_names)
+    return prioritized + remaining, len(prioritized)
+
+
 def _idempotent_footprint_job(
     session: Session,
     *,
     user_id: str,
     idempotency_key: str,
     payload_hash: str,
+    now=None,
 ) -> SearchJob | None:
     existing = session.scalar(
         select(IdempotencyRecord).where(
@@ -373,6 +534,8 @@ def _idempotent_footprint_job(
     job = session.get(SearchJob, existing.job_id)
     if not job or job.job_kind != "footprint_discovery":
         raise ApiError(409, "idempotency_conflict", "The prior job is unavailable.")
+    if now is not None and _expired(job.expires_at, now):
+        raise ApiError(409, "idempotency_conflict", "The prior job is unavailable.")
     return job
 
 
@@ -384,11 +547,8 @@ def create_footprint_job(
     user_id: str,
     idempotency_key: str,
     request_payload: dict[str, object],
+    refresh_of_job_id: str | None = None,
 ) -> tuple[SearchJob, bool]:
-    if not settings.prototype_jobs_enabled:
-        raise ApiError(503, "prototype_disabled", "New prototype jobs are temporarily disabled.")
-    if not settings.maigret_enabled:
-        raise ApiError(503, "provider_disabled", "Profile discovery is temporarily unavailable.")
     if not 8 <= len(idempotency_key) <= 128:
         raise ApiError(422, "invalid_request", "The request could not be accepted.")
 
@@ -422,20 +582,17 @@ def create_footprint_job(
     locale = str(request_payload.get("locale", "en-US"))
     if locale not in {"en-US", "zh-CN"}:
         raise ApiError(422, "invalid_request", "The requested locale is unavailable.")
+    history_policy = str(request_payload.get("history_policy", "new_job"))
+    if history_policy not in {"new_job", "prefer_existing"}:
+        raise ApiError(422, "invalid_request", "The requested history policy is unavailable.")
+    if refresh_of_job_id is not None:
+        history_policy = "new_job"
 
-    manifest = load_catalog_manifest(settings.maigret_catalog_manifest)
-    profile = manifest.profile(CATALOG_PROFILE_BY_SEARCH_MODE[search_mode])
-    selected_sites = _prioritize_sites_for_seed(
-        profile.site_names,
-        seed_platform=seed_platform,
+    now = clock.now()
+    normalized_identifier_hmac = keyed_hmac(
+        normalized_seed,
+        settings.prototype_hmac_key,
     )
-    shards = _chunks(selected_sites, profile.shard_size)
-    if len(shards) > settings.maigret_max_shards_per_job:
-        raise ApiError(
-            503,
-            "service_unavailable",
-            "The discovery catalog exceeds its shard budget.",
-        )
 
     normalized_seed_payload: dict[str, object] = {
         "kind": seed_kind,
@@ -450,7 +607,8 @@ def create_footprint_job(
         "search_mode": search_mode,
         "synthesis_model": synthesis_model,
         "locale": locale,
-        "manifest_checksum": manifest.manifest_checksum,
+        "history_policy": history_policy,
+        "refresh_of_job_id": refresh_of_job_id,
     }
     payload_hash = stable_payload_hash(normalized_payload)
     existing_job = _idempotent_footprint_job(
@@ -458,22 +616,105 @@ def create_footprint_job(
         user_id=user_id,
         idempotency_key=idempotency_key,
         payload_hash=payload_hash,
+        now=now,
     )
     if existing_job is not None:
         return existing_job, False
 
-    now = clock.now()
+    if history_policy == "prefer_existing":
+        try:
+            with session.begin_nested():
+                _lock_compatible_history_key(
+                    session,
+                    user_id=user_id,
+                    normalized_identifier_hmac=normalized_identifier_hmac,
+                    search_mode=search_mode,
+                    synthesis_model=synthesis_model,
+                    locale=locale,
+                )
+                compatible_job = _latest_compatible_history_job(
+                    session,
+                    user_id=user_id,
+                    normalized_identifier_hmac=normalized_identifier_hmac,
+                    search_mode=search_mode,
+                    synthesis_model=synthesis_model,
+                    locale=locale,
+                    now=now,
+                    report_reads_enabled=settings.prototype_report_reads_enabled,
+                )
+        except SQLAlchemyError:
+            # History is an optimization. A lookup-specific database failure
+            # rolls back to this savepoint and normal creation remains available.
+            compatible_job = None
+        if compatible_job is not None:
+            session.add(
+                IdempotencyRecord(
+                    user_id=user_id,
+                    idempotency_key=idempotency_key,
+                    payload_hash=payload_hash,
+                    job_id=compatible_job.id,
+                    created_at=now,
+                    expires_at=compatible_job.expires_at,
+                )
+            )
+            try:
+                session.flush()
+            except IntegrityError:
+                session.rollback()
+                replay = _idempotent_footprint_job(
+                    session,
+                    user_id=user_id,
+                    idempotency_key=idempotency_key,
+                    payload_hash=payload_hash,
+                    now=now,
+                )
+                if replay is None:
+                    raise
+                return replay, False
+            return compatible_job, False
+
+    if not settings.prototype_jobs_enabled:
+        raise ApiError(503, "prototype_disabled", "New prototype jobs are temporarily disabled.")
+    if not settings.maigret_enabled:
+        raise ApiError(503, "provider_disabled", "Profile discovery is temporarily unavailable.")
+
+    manifest = load_catalog_manifest(settings.maigret_catalog_manifest)
+    profile = manifest.profile(CATALOG_PROFILE_BY_SEARCH_MODE[search_mode])
+    selected_sites = _prioritize_sites_for_seed(
+        profile.site_names,
+        seed_platform=seed_platform,
+    )
+
+    history_source = _eligible_history_hint_source(
+        session,
+        source_job_id=refresh_of_job_id,
+        user_id=user_id,
+        normalized_identifier_hmac=normalized_identifier_hmac,
+        now=now,
+        report_reads_enabled=settings.prototype_report_reads_enabled,
+    )
+    selected_sites, history_site_count = _history_prioritized_sites(
+        session,
+        source_job=history_source,
+        selected_sites=selected_sites,
+    )
+    shards = _chunks(selected_sites, profile.shard_size)
+    if len(shards) > settings.maigret_max_shards_per_job:
+        raise ApiError(
+            503,
+            "service_unavailable",
+            "The discovery catalog exceeds its shard budget.",
+        )
+
     expires_at = now + timedelta(days=settings.retention_days)
     deadline_at = now + timedelta(minutes=5)
     snapshot = _ensure_catalog_snapshot(session, manifest=manifest, now=now)
     job = SearchJob(
         id=new_id(),
         user_id=user_id,
-        retry_of_job_id=None,
-        normalized_identifier_hmac=keyed_hmac(
-            normalized_seed,
-            settings.prototype_hmac_key,
-        ),
+        refresh_of_job_id=refresh_of_job_id,
+        history_reuse_policy=(HISTORY_REUSE_POLICY if history_source else None),
+        normalized_identifier_hmac=normalized_identifier_hmac,
         canonical_input_url_ciphertext=(
             encrypt_value(
                 normalized.canonical_profile_url,
@@ -530,6 +771,19 @@ def create_footprint_job(
     session.flush()
 
     for shard_index, site_names in enumerate(shards):
+        is_history_priority_shard = bool(history_site_count and shard_index == 0)
+        query_config: dict[str, object] = {
+            "shard_index": shard_index,
+            "site_names": list(site_names),
+            "catalog_profile": profile.name,
+        }
+        if is_history_priority_shard:
+            query_config.update(
+                {
+                    "history_revalidation": True,
+                    "history_positive_site_count": history_site_count,
+                }
+            )
         run = ProviderRun(
             id=new_id(),
             job_id=job.id,
@@ -538,11 +792,7 @@ def create_footprint_job(
             provider_id="maigret_discovery_v1",
             parent_run_id=None,
             depth=0,
-            query_config={
-                "shard_index": shard_index,
-                "site_names": list(site_names),
-                "catalog_profile": profile.name,
-            },
+            query_config=query_config,
             status="pending",
             required_for_finalization=True,
             lease_generation=0,
@@ -593,6 +843,7 @@ def create_footprint_job(
                     "provider_run_id": run.id,
                     "scan_run_id": run.id,
                 },
+                priority=9 if is_history_priority_shard else 0,
                 created_at=now,
                 dispatched_at=None,
                 attempts=0,
@@ -616,6 +867,21 @@ def create_footprint_job(
         message=f"Discovery accepted for @{identifier}.",
         created_at=now,
     )
+    if history_source is not None:
+        add_event(
+            session,
+            job_id=job.id,
+            event_type="history.reuse_hints_applied",
+            message=(
+                (
+                    f"Prioritized {history_site_count} previously positive catalog "
+                    f"{'site' if history_site_count == 1 else 'sites'} for fresh revalidation."
+                )
+                if history_site_count
+                else "Loaded saved-run planning context without copying prior evidence."
+            ),
+            created_at=now,
+        )
     try:
         # Force the unique idempotency claim inside this service so a concurrent
         # winner can be replayed instead of surfacing a commit-time integrity error.
@@ -627,11 +893,69 @@ def create_footprint_job(
             user_id=user_id,
             idempotency_key=idempotency_key,
             payload_hash=payload_hash,
+            now=now,
         )
         if replay is None:
             raise
         return replay, False
     return job, True
+
+
+def refresh_footprint_job(
+    session: Session,
+    *,
+    settings,
+    clock,
+    user_id: str,
+    source_job_id: str,
+    idempotency_key: str,
+) -> tuple[SearchJob, bool]:
+    """Create a fresh run from saved user choices and the current runtime policy."""
+
+    source = owner_footprint_job(
+        session,
+        job_id=source_job_id,
+        user_id=user_id,
+        for_update=True,
+        now=clock.now(),
+    )
+    seed: dict[str, object] = {
+        "kind": source.seed_kind,
+        "platform": source.seed_platform,
+        "identifier_type": source.seed_identifier_type or "handle",
+        "identifier": source.seed_identifier,
+    }
+    if source.seed_kind == "profile_url":
+        if not source.canonical_input_url_ciphertext:
+            raise ApiError(503, "service_unavailable", "The stored profile seed is unavailable.")
+        try:
+            seed["profile_url"] = decrypt_value(
+                source.canonical_input_url_ciphertext,
+                settings.profile_url_encryption_key,
+            )
+        except InvalidEncryptedValue as exc:
+            raise ApiError(
+                503,
+                "service_unavailable",
+                "The stored profile seed is unavailable.",
+            ) from exc
+    payload: dict[str, object] = {
+        "seed": seed,
+        "search_mode": source.search_mode or "quick",
+        "locale": source.locale,
+        "history_policy": "new_job",
+    }
+    if source.search_mode == "deep" and source.synthesis_model is not None:
+        payload["synthesis_model"] = source.synthesis_model
+    return create_footprint_job(
+        session,
+        settings=settings,
+        clock=clock,
+        user_id=user_id,
+        idempotency_key=idempotency_key,
+        request_payload=payload,
+        refresh_of_job_id=source.id,
+    )
 
 
 def owner_footprint_job(
@@ -640,12 +964,15 @@ def owner_footprint_job(
     job_id: str,
     user_id: str,
     for_update: bool = False,
+    now=None,
 ) -> SearchJob:
     statement = select(SearchJob).where(
         SearchJob.id == job_id,
         SearchJob.user_id == user_id,
         SearchJob.job_kind == "footprint_discovery",
     )
+    if now is not None:
+        statement = statement.where(SearchJob.expires_at > now)
     if for_update:
         statement = statement.with_for_update()
     job = session.scalar(statement)
@@ -879,4 +1206,6 @@ def footprint_job_response(
         "candidates_url": f"/v1/footprint-jobs/{job.id}/candidates",
         "accepted_at": job.accepted_at,
         "deadline_at": job.deadline_at,
+        "expires_at": job.expires_at,
+        "refresh_of_job_id": job.refresh_of_job_id,
     }

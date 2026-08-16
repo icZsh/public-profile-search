@@ -1569,7 +1569,8 @@ def test_footprint_idempotency_validation_and_owner_isolation(
 ):
     first = create_footprint_job(client, auth_headers, key="same-footprint-request")
     second = create_footprint_job(client, auth_headers, key="same-footprint-request")
-    assert first.status_code == second.status_code == 202
+    assert first.status_code == 202
+    assert second.status_code == 200
     assert first.json()["job_id"] == second.json()["job_id"]
 
     conflict = create_footprint_job(
@@ -1638,7 +1639,7 @@ def test_concurrent_idempotency_claim_replays_the_committed_winner(
         key="raced-footprint-request",
     )
 
-    assert replay.status_code == 202
+    assert replay.status_code == 200
     assert replay.json()["job_id"] == first.json()["job_id"]
     assert lookup_count == 2
     with app.state.session_factory() as session:

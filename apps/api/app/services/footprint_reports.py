@@ -21,11 +21,12 @@ def _active_footprint_report(
     job_id: str,
     user_id: str,
     reads_enabled: bool,
+    now,
 ) -> tuple[ReportRevision, CollectionSnapshot]:
     if not reads_enabled:
         raise ApiError(404, "result_unavailable", "The result is unavailable.")
 
-    job = owner_footprint_job(session, job_id=job_id, user_id=user_id)
+    job = owner_footprint_job(session, job_id=job_id, user_id=user_id, now=now)
     attempt = session.get(JobAttempt, job.active_attempt_id)
     if not attempt or not attempt.current_report_revision_id:
         raise ApiError(409, "job_not_ready", "The footprint brief is not ready.")
@@ -60,12 +61,14 @@ def get_footprint_brief(
     job_id: str,
     user_id: str,
     reads_enabled: bool,
+    now,
 ) -> dict[str, object]:
     report, _snapshot = _active_footprint_report(
         session,
         job_id=job_id,
         user_id=user_id,
         reads_enabled=reads_enabled,
+        now=now,
     )
     content = report.content
     if (
@@ -83,12 +86,14 @@ def get_footprint_evidence(
     job_id: str,
     user_id: str,
     reads_enabled: bool,
+    now,
 ) -> list[dict[str, object]]:
     _report, snapshot = _active_footprint_report(
         session,
         job_id=job_id,
         user_id=user_id,
         reads_enabled=reads_enabled,
+        now=now,
     )
     observation_ids = {str(observation_id) for observation_id in snapshot.observation_ids}
     if not observation_ids:

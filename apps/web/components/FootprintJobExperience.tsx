@@ -11,7 +11,7 @@ import type {
 } from "@public-profile-search/generated-api-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CandidateResults } from "@/components/CandidateResults";
 import { FootprintBrief } from "@/components/FootprintBrief";
@@ -19,10 +19,12 @@ import {
   ApiError,
   cancelFootprintJob,
   createFootprintJob,
+  createIdempotencyKey,
   getFootprintBrief,
   getFootprintCandidates,
   getFootprintEvidence,
   getFootprintJob,
+  refreshFootprintJob,
   selectFootprintAnchor,
 } from "@/lib/api";
 
@@ -234,6 +236,9 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
   const [pollGeneration, setPollGeneration] = useState(0);
   const [elapsedNow, setElapsedNow] = useState(() => Date.now());
   const [upgrading, setUpgrading] = useState(false);
+  const [refreshingSavedSearch, setRefreshingSavedSearch] = useState(false);
+  const [savedSearchError, setSavedSearchError] = useState("");
+  const refreshAttempt = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -459,7 +464,7 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
           synthesis_model: model,
           locale: "en-US",
         },
-        crypto.randomUUID(),
+        createIdempotencyKey(),
       );
       router.push(`/footprint/${nextJob.job_id}`);
     } catch (reason) {
@@ -469,6 +474,29 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
           : "The Deep brief could not be started. Please try again.",
       );
       setUpgrading(false);
+    }
+  }
+
+  async function refreshSavedSearch() {
+    if (!job || refreshingSavedSearch) return;
+    setRefreshingSavedSearch(true);
+    setSavedSearchError("");
+    refreshAttempt.current ??= createIdempotencyKey();
+
+    try {
+      const nextJob = await refreshFootprintJob(
+        job.job_id,
+        refreshAttempt.current,
+      );
+      refreshAttempt.current = null;
+      router.push(`/footprint/${nextJob.job_id}`);
+    } catch (reason) {
+      setSavedSearchError(
+        reason instanceof Error
+          ? reason.message
+          : "This saved search could not be refreshed. Please try again.",
+      );
+      setRefreshingSavedSearch(false);
     }
   }
 
@@ -499,10 +527,8 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
       ? job.seed.profile_url
       : `${job.seed.platform ? `${job.seed.platform} · ` : ""}@${job.seed.identifier}`
     : "Loading seed";
-  const searchModeLabel = deepMode ? "Deep story" : "Quick evidence";
   const deepProgressStopped =
     deepMode && (job?.status === "failed" || job?.status === "cancelled");
-  const deepProgressComplete = deepProgressPhase === "complete";
   const currentStatusLabel =
     job?.status === "failed" || job?.status === "cancelled"
       ? readableStatus(job.status)
@@ -551,26 +577,6 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
         </div>
 
         <div className="traceTopbarActions">
-          <details className="traceOperatorDisclosure">
-            <summary>Operator view</summary>
-            <div>
-              <strong>Discovery {jobId.slice(0, 8)}</strong>
-              <span>{job ? `${job.catalog.engine} ${job.catalog.package_version ?? ""}` : "Connecting"}</span>
-              <span>{searchModeLabel} mode · Adaptive discovery catalog</span>
-              {job ? <span>Started {formattedDate(job.accepted_at)}</span> : null}
-              {job ? <span>Retrieval cutoff {formattedDate(job.deadline_at)}</span> : null}
-              {deepProgressComplete && job?.deep_progress?.finished_at ? (
-                <>
-                  <span>Status <strong>✓ Complete</strong></span>
-                  <span>Completed in <strong>{deepTotalElapsed}</strong></span>
-                  <span>Completed {formattedDate(job.deep_progress.finished_at)}</span>
-                </>
-              ) : (
-                <span>Current stage <strong>{deepStageElapsed}</strong></span>
-              )}
-            </div>
-          </details>
-
           {brief ? (
             <>
               <Link className="traceSecondaryButton" href="/">
@@ -599,6 +605,32 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
           ) : null}
         </div>
       </nav>
+
+      {job ? (
+        <section className="traceSavedSearchMeta" aria-label="Saved search details">
+          <div>
+            <span>Saved search</span>
+            <strong>
+              Searched <time dateTime={job.accepted_at}>{formattedDate(job.accepted_at)}</time>
+            </strong>
+            <small>
+              Available until <time dateTime={job.expires_at}>{formattedDate(job.expires_at)}</time>
+            </small>
+          </div>
+          <button
+            className="tracePrimaryButton"
+            type="button"
+            onClick={() => void refreshSavedSearch()}
+            disabled={refreshingSavedSearch}
+            aria-busy={refreshingSavedSearch}
+          >
+            {refreshingSavedSearch ? "Starting fresh search…" : "Refresh with same settings"}
+          </button>
+          {savedSearchError ? (
+            <p role="alert">{savedSearchError}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       <div
         className="traceSrOnly"

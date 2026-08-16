@@ -6,7 +6,10 @@ import type {
   EvidenceItem,
   FastBrief,
   FootprintBrief,
+  FootprintHistoryGroupPage,
+  FootprintHistoryRunPage,
   FootprintJob,
+  ClearFootprintHistoryResponse,
   PrototypeConfig,
   SearchJob,
   SelectFootprintAnchorRequest,
@@ -20,6 +23,31 @@ const API_TOKEN =
 const USER_ID =
   process.env.NEXT_PUBLIC_PROTOTYPE_USER_ID ??
   "11111111-1111-4111-8111-111111111111";
+
+export function createIdempotencyKey(): string {
+  const cryptoProvider = globalThis.crypto;
+  if (typeof cryptoProvider?.randomUUID === "function") {
+    return cryptoProvider.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof cryptoProvider?.getRandomValues === "function") {
+    cryptoProvider.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (value) =>
+    value.toString(16).padStart(2, "0"),
+  );
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
+    .slice(6, 8)
+    .join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
 
 interface ApiErrorBody {
   error_code?: string;
@@ -83,7 +111,7 @@ export async function createEligibilityVerification(
   return unwrap(
     await fetch(`${API_BASE_URL}/v1/eligibility-verifications`, {
       method: "POST",
-      headers: headers({ "Idempotency-Key": crypto.randomUUID() }),
+      headers: headers({ "Idempotency-Key": createIdempotencyKey() }),
       body: JSON.stringify({
         profile_url: profileUrl,
         purpose: "self_audit",
@@ -114,7 +142,7 @@ export async function completeEligibilityVerification(
       `${API_BASE_URL}/v1/eligibility-verifications/${encodeURIComponent(verificationId)}/complete`,
       {
         method: "POST",
-        headers: headers({ "Idempotency-Key": crypto.randomUUID() }),
+        headers: headers({ "Idempotency-Key": createIdempotencyKey() }),
       },
     ),
   );
@@ -126,7 +154,7 @@ export async function createSearchJob(
   return unwrap(
     await fetch(`${API_BASE_URL}/v1/search-jobs`, {
       method: "POST",
-      headers: headers({ "Idempotency-Key": crypto.randomUUID() }),
+      headers: headers({ "Idempotency-Key": createIdempotencyKey() }),
       body: JSON.stringify(payload),
     }),
   );
@@ -184,13 +212,113 @@ export async function deleteSearchJob(jobId: string): Promise<void> {
 
 export async function createFootprintJob(
   payload: CreateFootprintJobRequest,
-  idempotencyKey = crypto.randomUUID(),
+  idempotencyKey = createIdempotencyKey(),
 ): Promise<FootprintJob> {
   return unwrap(
     await fetch(`${API_BASE_URL}/v1/footprint-jobs`, {
       method: "POST",
       headers: headers({ "Idempotency-Key": idempotencyKey }),
       body: JSON.stringify(payload),
+    }),
+  );
+}
+
+export interface FootprintHistoryQuery {
+  q?: string;
+  cursor?: string;
+  limit?: number;
+  signal?: AbortSignal;
+}
+
+function historyQueryString({
+  q,
+  cursor,
+  limit,
+}: Omit<FootprintHistoryQuery, "signal">): string {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (cursor) params.set("cursor", cursor);
+  if (limit !== undefined) params.set("limit", String(limit));
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export async function getFootprintHistory({
+  signal,
+  ...query
+}: FootprintHistoryQuery = {}): Promise<FootprintHistoryGroupPage> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs${historyQueryString(query)}`,
+      {
+        headers: headers(),
+        cache: "no-store",
+        signal,
+      },
+    ),
+  );
+}
+
+export async function getFootprintHistoryRuns(
+  jobId: string,
+  {
+    signal,
+    ...query
+  }: Omit<FootprintHistoryQuery, "q"> = {},
+): Promise<FootprintHistoryRunPage> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/history${historyQueryString(query)}`,
+      {
+        headers: headers(),
+        cache: "no-store",
+        signal,
+      },
+    ),
+  );
+}
+
+export async function refreshFootprintJob(
+  jobId: string,
+  idempotencyKey = createIdempotencyKey(),
+): Promise<FootprintJob> {
+  return unwrap(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}/refresh`,
+      {
+        method: "POST",
+        headers: headers({ "Idempotency-Key": idempotencyKey }),
+      },
+    ),
+  );
+}
+
+async function unwrapEmpty(response: Response): Promise<void> {
+  if (!response.ok) {
+    await unwrap<never>(response);
+  }
+}
+
+export async function deleteFootprintJob(jobId: string): Promise<void> {
+  return unwrapEmpty(
+    await fetch(
+      `${API_BASE_URL}/v1/footprint-jobs/${encodeURIComponent(jobId)}`,
+      {
+        method: "DELETE",
+        headers: headers(),
+      },
+    ),
+  );
+}
+
+export async function clearFootprintHistory(
+  limit = 50,
+): Promise<ClearFootprintHistoryResponse> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  return unwrap(
+    await fetch(`${API_BASE_URL}/v1/footprint-jobs?${query.toString()}`, {
+      method: "DELETE",
+      headers: headers(),
     }),
   );
 }

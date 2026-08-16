@@ -19,7 +19,7 @@ def get_candidates(
     settings: object,
     now,
 ) -> dict[str, object]:
-    job = owner_footprint_job(session, job_id=job_id, user_id=user_id)
+    job = owner_footprint_job(session, job_id=job_id, user_id=user_id, now=now)
     anchor_eligible_ids = (
         eligible_anchor_candidate_ids(
             session,

@@ -75,6 +75,35 @@ adaptive second wave. Exa is optional: set the server-only `EXA_API_KEY` to enab
 LinkedIn people results. Quick intentionally skips professional retrieval when Exa is
 unavailable; Deep can still use the GitHub public-profile path without it.
 
+### Search history and refresh
+
+Footprint searches are also the server-backed search history; the browser does not
+keep a separate local copy. History is scoped to the authenticated prototype user,
+served with private/no-store caching, and retained for 30 days. The homepage history
+drawer groups equivalent platform-qualified handles and supported profile URLs by
+their exact normalized platform and handle. A bare handle stays in its own group, so
+textually identical handles on unrelated platforms are never merged.
+
+The homepage requests `prefer_existing` behavior. Repeating a seed opens the latest
+unexpired active or usable run immediately when its mode, selected Deep model, and
+locale also match; otherwise it creates a new run. This lookup is an optimization, so
+a history lookup failure falls back to normal creation rather than blocking a search.
+API clients remain backward compatible: omitting `history_policy` creates a new job.
+
+**Refresh** creates a new run using the selected run's seed, mode, locale, and explicit
+Deep model choice while applying the current catalog, providers, budgets, and policy.
+Eligible prior positive sites, professional candidates, and names may be used only to
+order fresh checks. Every site is rechecked, every returned profile is retrieved
+again, and synthesis uses only observations from the new run. Account nodes, claims,
+reports, negative results, anchor choices, and identity conclusions are never copied
+from history. Refresh therefore provides earlier revalidated leads where possible; it
+does not promise a shorter total run time.
+
+Individual terminal runs can be permanently deleted. **Clear all history** deletes
+terminal runs in bounded batches and preserves queued or discovering searches. Owner
+reads reject expired history, and a separately timed hourly sweep fences late writes
+and physically deletes expired jobs without interrupting normal dispatch maintenance.
+
 To keep the complete local stack running after terminal closure and restart it at
 login, install the macOS LaunchAgent:
 
@@ -145,10 +174,14 @@ scan starts.
 - `PROTOTYPE_REPORT_READS_ENABLED=false` disables both legacy and footprint brief
   reads without stopping collection.
 
-The local browser token is intentionally visible because this is a single-user
-prototype. The API still rejects `APP_ENV=production` while prototype authentication is
-enabled. Replace authentication, authorization, rate limits, provider review, privacy
-review, and network egress controls before shared or production use.
+The local browser token and prototype user ID are intentionally visible because this
+is a single-user prototype. Every browser configured with the same fixed credentials,
+including another device on the trusted LAN, has the same owner scope and therefore
+sees the same history. This is isolation by prototype user ID, not production-grade
+multi-user authentication. The API still rejects `APP_ENV=production` while prototype
+authentication is enabled. Replace authentication, authorization, rate limits,
+provider review, privacy review, and network egress controls before shared or
+production use.
 
 Maigret performs live requests to third-party sites. Results can be stale or ambiguous,
 and site behavior can change independently of this application. Use the prototype

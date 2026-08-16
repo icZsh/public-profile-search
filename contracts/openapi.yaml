@@ -364,6 +364,47 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
   /v1/footprint-jobs:
+    get:
+      tags: [Footprint discovery]
+      operationId: listFootprintHistory
+      description: >-
+        Returns the owner's unexpired footprint-search history grouped by exact
+        normalized seed. Groups are ordered by their latest run. Profile URLs
+        and platform-qualified handles share a group when they normalize to the
+        same platform and handle; bare handles remain separate.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+        - name: q
+          in: query
+          description: Optional case-insensitive seed identifier filter.
+          schema:
+            type: string
+            maxLength: 160
+        - name: cursor
+          in: query
+          description: Opaque cursor returned by the previous page.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Newest-first page of exact-seed history groups.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintHistoryGroupPage"
+        "401":
+          $ref: "#/components/responses/Error"
     post:
       tags: [Footprint discovery]
       operationId: createFootprintJob
@@ -384,8 +425,14 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateFootprintJobRequest"
       responses:
+        "200":
+          description: Latest compatible active or usable unexpired job reused.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintJob"
         "202":
-          description: Discovery job accepted.
+          description: New discovery job accepted.
           content:
             application/json:
               schema:
@@ -397,6 +444,32 @@ paths:
         "422":
           $ref: "#/components/responses/Error"
         "503":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Footprint discovery]
+      operationId: clearFootprintHistory
+      description: >-
+        Permanently deletes a bounded batch of terminal footprint jobs owned by
+        the caller. Queued and discovering jobs are preserved.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PrototypeUser"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 50
+      responses:
+        "200":
+          description: Bounded clear-history result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearFootprintHistoryResponse"
+        "401":
           $ref: "#/components/responses/Error"
   /v1/footprint-jobs/{job_id}:
     parameters:
@@ -429,6 +502,76 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/history:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+      - $ref: "#/components/parameters/PrototypeUser"
+    get:
+      tags: [Footprint discovery]
+      operationId: listFootprintJobHistory
+      description: >-
+        Returns unexpired runs in the referenced job's exact normalized-seed
+        group, ordered newest first.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          description: Opaque cursor returned by the previous page.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Newest-first page of runs for the exact normalized seed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintHistoryRunPage"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/footprint-jobs/{job_id}/refresh:
+    parameters:
+      - $ref: "#/components/parameters/JobId"
+      - $ref: "#/components/parameters/PrototypeUser"
+    post:
+      tags: [Footprint discovery]
+      operationId: refreshFootprintJob
+      description: >-
+        Creates a new run using the source job's seed and user-selected search
+        settings. Historical positives may prioritize fresh checks but are
+        never copied into the new result or treated as current evidence.
+      security:
+        - prototypeAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "202":
+          description: Refreshed discovery job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootprintJob"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
           $ref: "#/components/responses/Error"
   /v1/footprint-jobs/{job_id}/cancel:
     post:
@@ -1741,6 +1884,14 @@ components:
           type: string
           enum: [en-US, zh-CN]
           default: en-US
+        history_policy:
+          type: string
+          enum: [new_job, prefer_existing]
+          default: new_job
+          description: >-
+            new_job preserves the original create behavior. prefer_existing
+            reopens the latest compatible active or usable unexpired job when
+            one exists, otherwise it creates a new job.
     FootprintSynthesisModel:
       type: string
       enum:
@@ -1828,6 +1979,8 @@ components:
         - candidates_url
         - accepted_at
         - deadline_at
+        - expires_at
+        - refresh_of_job_id
       properties:
         job_id:
           type: string
@@ -1872,6 +2025,136 @@ components:
         deadline_at:
           type: string
           format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        refresh_of_job_id:
+          type: [string, "null"]
+          format: uuid
+    FootprintHistorySeed:
+      type: object
+      additionalProperties: false
+      required: [kind, platform, identifier]
+      properties:
+        kind:
+          type: string
+          enum: [platform_identifier, bare_handle]
+        platform:
+          type: [string, "null"]
+          enum:
+            - github
+            - instagram
+            - linkedin
+            - reddit
+            - tiktok
+            - twitter
+            - x
+            - youtube
+            - other
+            - null
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 64
+    FootprintHistoryRun:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - search_mode
+        - synthesis_model
+        - accepted_at
+        - finished_at
+        - expires_at
+        - candidate_count
+        - result_available
+        - refresh_of_job_id
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+            - discovering
+            - ready
+            - ready_partial
+            - no_candidates
+            - failed
+            - cancelled
+        search_mode:
+          type: string
+          enum: [quick, deep]
+        synthesis_model:
+          anyOf:
+            - $ref: "#/components/schemas/FootprintSynthesisModel"
+            - type: "null"
+        accepted_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: [string, "null"]
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        candidate_count:
+          type: integer
+          minimum: 0
+        result_available:
+          type: boolean
+        refresh_of_job_id:
+          type: [string, "null"]
+          format: uuid
+    FootprintHistoryGroup:
+      type: object
+      additionalProperties: false
+      required: [representative_job_id, seed, latest_run, run_count]
+      properties:
+        representative_job_id:
+          type: string
+          format: uuid
+        seed:
+          $ref: "#/components/schemas/FootprintHistorySeed"
+        latest_run:
+          $ref: "#/components/schemas/FootprintHistoryRun"
+        run_count:
+          type: integer
+          minimum: 1
+    FootprintHistoryGroupPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintHistoryGroup"
+        next_cursor:
+          type: [string, "null"]
+    FootprintHistoryRunPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootprintHistoryRun"
+        next_cursor:
+          type: [string, "null"]
+    ClearFootprintHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [deleted_count, has_more]
+      properties:
+        deleted_count:
+          type: integer
+          minimum: 0
+        has_more:
+          type: boolean
     SelectFootprintAnchorRequest:
       type: object
       additionalProperties: false

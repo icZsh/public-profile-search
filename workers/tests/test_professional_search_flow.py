@@ -68,7 +68,8 @@ def _add_job(
             SearchJob(
                 id=job_id,
                 user_id="professional-test-user",
-                retry_of_job_id=None,
+                refresh_of_job_id=None,
+                history_reuse_policy=None,
                 normalized_identifier_hmac="a" * 64,
                 canonical_input_url_ciphertext=None,
                 input_provider_id="maigret_discovery_v1",
@@ -1199,16 +1200,22 @@ class _RecordingPublisher:
         self.maigret_runs: list[tuple[str, str]] = []
         self.professional_runs: list[tuple[str, str]] = []
 
-    def send_provider_run(self, provider_run_id: str, task_id: str) -> None:
+    def send_provider_run(
+        self, provider_run_id: str, task_id: str, *, priority: int = 0
+    ) -> None:
         self.provider_runs.append((provider_run_id, task_id))
 
-    def send_maigret_scan_run(self, provider_run_id: str, task_id: str) -> None:
+    def send_maigret_scan_run(
+        self, provider_run_id: str, task_id: str, *, priority: int = 0
+    ) -> None:
         self.maigret_runs.append((provider_run_id, task_id))
 
     def send_professional_search_run(
         self,
         provider_run_id: str,
         task_id: str,
+        *,
+        priority: int = 0,
     ) -> None:
         self.professional_runs.append((provider_run_id, task_id))
 

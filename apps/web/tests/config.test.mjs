@@ -62,8 +62,10 @@ test("the footprint form submits a discriminated seed and opens the discovery ro
   assert.doesNotMatch(searchForm, /kind: "platform_identifier"/);
   assert.match(searchForm, /useState<FootprintSearchMode>\("quick"\)/);
   assert.match(searchForm, /name="search_mode"/);
-  assert.match(searchForm, /value: "quick"/);
-  assert.match(searchForm, /value: "deep"/);
+  assert.match(searchForm, /className="traceDeepModeToggle"/);
+  assert.match(searchForm, /aria-pressed=\{searchMode === "deep"\}/);
+  assert.match(searchForm, /setSearchMode\(\(current\) => current === "deep" \? "quick" : "deep"\)/);
+  assert.doesNotMatch(searchForm, /type="radio"/);
   assert.match(searchForm, /search_mode: searchMode/);
   assert.match(searchForm, /useState<FootprintSynthesisModel>\(DEFAULT_SYNTHESIS_MODEL\)/);
   assert.match(
@@ -73,11 +75,14 @@ test("the footprint form submits a discriminated seed and opens the discovery ro
   assert.match(searchForm, /name="synthesis_model"/);
   assert.match(searchForm, /<select/);
   assert.match(searchForm, /htmlFor="synthesis-model"/);
-  assert.match(searchForm, /selectedSynthesisOption\.speedLabel/);
   assert.doesNotMatch(searchForm, /<input[^>]*name="synthesis_model"/);
-  assert.match(searchForm, /aria-describedby="synthesis-model-note"/);
-  assert.match(searchForm, /Prices and relative latency estimates can change/);
-  assert.match(searchForm, /varies by model/);
+  assert.match(searchForm, /className="traceInlineModelPicker"/);
+  assert.doesNotMatch(searchForm, /selectedSynthesisOption/);
+  assert.doesNotMatch(searchForm, /Prices and relative latency estimates can change/);
+  assert.match(searchForm, /role="tooltip"/);
+  assert.match(searchForm, /id="search-depth-tooltip"/);
+  assert.match(searchForm, /MagnifyingGlassIcon/);
+  assert.match(searchForm, /aria-label=\{busy \? "Starting the brief" : "Build the brief"\}/);
   assert.match(synthesisModels, /"openai\/gpt-5\.6-luna"/);
   assert.match(synthesisModels, /"openai\/gpt-5\.4-nano"/);
   assert.match(synthesisModels, /"openai\/gpt-5\.4-mini"/);
@@ -119,17 +124,28 @@ test("the footprint form submits a discriminated seed and opens the discovery ro
     synthesisModels,
     /inputPrice: "\$0\.76",[\s\S]*outputPrice: "\$2\.42"/,
   );
-  assert.match(revampStyles, /\.traceModelPicker/);
-  assert.match(revampStyles, /\.traceModelControl select:focus-visible/);
-  assert.match(revampStyles, /\.traceModelSummary/);
+  assert.match(revampStyles, /\.traceInlineModelPicker/);
+  assert.match(revampStyles, /\.traceInlineModelPicker select:focus-visible/);
+  assert.match(revampStyles, /\.traceSearchModeTooltip/);
+  assert.match(revampStyles, /\.traceSearchModeTooltipOpen/);
+  assert.match(revampStyles, /\.traceSearchBusySpinner/);
+  assert.match(revampStyles, /\.traceUnifiedSearch\s*\{[^}]*border-radius:\s*999px/);
+  assert.match(revampStyles, /\.traceUnifiedSearch:focus-within/);
+  assert.match(revampStyles, /\.traceDeepModeToggle\[aria-pressed="true"\]/);
+  assert.match(revampStyles, /\.traceSearchSubmit\s*\{[^}]*width:\s*44px/);
+  assert.doesNotMatch(revampStyles, /\.traceSearchActions/);
+  assert.doesNotMatch(revampStyles, /\.traceSearchDepthSummary/);
+  assert.doesNotMatch(revampStyles, /\.traceModelPicker/);
   assert.doesNotMatch(revampStyles, /\.traceModelOptions/);
   assert.match(
     revampStyles,
-    /@media \(max-width: 720px\)[\s\S]*\.traceModelPicker\s*\{[\s\S]*grid-template-columns: 1fr/,
+    /@media \(max-width: 720px\)[\s\S]*\.traceUnifiedSearchDeep\s*\{[^}]*minmax\(72px, 100px\)/,
   );
-  assert.match(searchForm, /Focused retrieval/i);
-  assert.match(searchForm, /broader 56-site scan and full professional search/i);
-  assert.match(searchForm, /<legend>Search depth<\/legend>/);
+  assert.match(revampStyles, /@media \(max-width: 720px\)[\s\S]*\.traceInlineModelPicker select/);
+  assert.match(searchForm, /focused account and people search/i);
+  assert.match(searchForm, /broader account and professional search/i);
+  assert.doesNotMatch(searchForm, /\b(?:20|56)(?:-site| sites?)/i);
+  assert.doesNotMatch(searchForm, /<legend>Search depth<\/legend>/);
   assert.match(searchForm, /createFootprintJob/);
   assert.match(searchForm, /creationAttempt/);
   assert.match(searchForm, /payloadSignature/);
@@ -146,6 +162,22 @@ test("the browser client uses eligibility APIs without exposing admin credential
   assert.match(api, /\/complete/);
   assert.match(api, /createSyntheticSearchJob/);
   assert.doesNotMatch(api, /PROTOTYPE_ADMIN|Admin-Token/i);
+});
+
+test("client idempotency keys work on insecure local-network HTTP origins", async () => {
+  const [api, searchForm, experience] = await Promise.all([
+    readWebFile("lib/api.ts"),
+    readWebFile("components/FootprintSearchForm.tsx"),
+    readWebFile("components/FootprintJobExperience.tsx"),
+  ]);
+
+  assert.match(api, /export function createIdempotencyKey/);
+  assert.match(api, /cryptoProvider\?\.randomUUID/);
+  assert.match(api, /cryptoProvider\?\.getRandomValues/);
+  assert.match(api, /bytes\[6\].*0x40/);
+  assert.match(api, /bytes\[8\].*0x80/);
+  assert.doesNotMatch(searchForm, /crypto\.randomUUID/);
+  assert.doesNotMatch(experience, /crypto\.randomUUID/);
 });
 
 test("external evidence links use no-opener and no-referrer protections", async () => {
@@ -203,13 +235,9 @@ test("the footprint client polls candidates and renders the terminal evidence-li
   assert.match(experience, /className="traceStepCompleteCheck"/);
   assert.match(experience, /Progress paused/);
   assert.match(experience, /Elapsed/);
-  assert.match(experience, /Status <strong>✓ Complete<\/strong>/);
-  assert.match(experience, /Completed in/);
-  assert.match(experience, /Completed \{formattedDate\(job\.deep_progress\.finished_at\)\}/);
-  assert.match(experience, /Current stage/);
   assert.doesNotMatch(experience, /deepStoryPreparing/);
   assert.match(experience, /Preparing Deep story/);
-  assert.match(experience, /Adaptive discovery catalog/);
+  assert.doesNotMatch(experience, /Operator view/i);
   assert.match(experience, /job\.seed\.kind === "profile_url"/);
   assert.match(experience, /job\.seed\.profile_url/);
   assert.doesNotMatch(experience, /job\.catalog\.profile/);

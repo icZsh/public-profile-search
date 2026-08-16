@@ -14,9 +14,12 @@ from apps.api.app.core.crypto import stable_payload_hash
 from apps.api.app.models.entities import (
     AccountNode,
     DiscoveryEdge,
+    JobAttempt,
     MaigretSiteCheck,
     OutboxMessage,
     ProviderRun,
+    ReportAccessState,
+    ReportRevision,
     SearchJob,
     new_id,
 )
@@ -134,6 +137,7 @@ _QUICK_ADAPTIVE_MAX_REQUESTS = 6
 _QUICK_ADAPTIVE_MAX_PROFILES = 10
 _QUICK_ADAPTIVE_MAX_BUDGET_SECONDS = 40
 _QUICK_ADAPTIVE_MAX_STAGNATION_QUERIES = 2
+_HISTORY_REUSE_POLICY = "planner_hints_revalidated_v1"
 
 
 @dataclass(frozen=True)
@@ -178,6 +182,90 @@ class _AdaptivePlanState:
     query_budget: int = 0
     request_budget: int = 0
     result_budget: int = 0
+
+
+@dataclass(frozen=True)
+class _HistoryProfessionalHints:
+    name_keys: frozenset[str]
+    github_logins_by_name: dict[str, tuple[str, ...]]
+
+
+def _history_professional_hints(
+    session: Session,
+    *,
+    job: SearchJob,
+    now,
+) -> _HistoryProfessionalHints:
+    """Read ranking/target hints only while the source result remains accessible."""
+
+    empty = _HistoryProfessionalHints(frozenset(), {})
+    if job.history_reuse_policy != _HISTORY_REUSE_POLICY or not job.refresh_of_job_id:
+        return empty
+    source = session.scalar(
+        select(SearchJob)
+        .where(SearchJob.id == job.refresh_of_job_id)
+        .with_for_update()
+    )
+    if (
+        source is None
+        or source.user_id != job.user_id
+        or source.normalized_identifier_hmac != job.normalized_identifier_hmac
+        or source.status not in {"ready", "ready_partial"}
+        or _deadline_reached(source.expires_at, now)
+    ):
+        return empty
+    attempt = session.get(JobAttempt, source.active_attempt_id)
+    access = (
+        session.get(ReportAccessState, attempt.current_report_revision_id)
+        if attempt and attempt.current_report_revision_id
+        else None
+    )
+    report = (
+        session.get(ReportRevision, attempt.current_report_revision_id)
+        if attempt and attempt.current_report_revision_id
+        else None
+    )
+    if (
+        not access
+        or access.job_id != source.id
+        or access.state != "active"
+        or report is None
+        or report.job_id != source.id
+        or report.status != "ready"
+        or report.report_type not in {"account_centric", "person_centric"}
+    ):
+        return empty
+
+    name_keys: set[str] = set()
+    github_logins: dict[str, list[str]] = defaultdict(list)
+    nodes = session.scalars(
+        select(AccountNode)
+        .where(AccountNode.job_id == source.id)
+        .order_by(AccountNode.platform, AccountNode.canonical_handle, AccountNode.id)
+    ).all()
+    for node in nodes:
+        profile_data = node.profile_data if isinstance(node.profile_data, dict) else {}
+        professional_sources = profile_data.get("professional_sources")
+        is_professional = node.platform.casefold() in {"github", "linkedin"} or bool(
+            isinstance(professional_sources, dict) and professional_sources
+        )
+        if not is_professional or not isinstance(node.display_name, str):
+            continue
+        full_name = _plausible_full_name(node.display_name)
+        if not full_name:
+            continue
+        key = _normalized_name_key(full_name)
+        name_keys.add(key)
+        if node.platform.casefold() == "github" and _GITHUB_LOGIN.fullmatch(
+            node.canonical_handle
+        ):
+            values = github_logins[key]
+            if node.canonical_handle.casefold() not in {value.casefold() for value in values}:
+                values.append(node.canonical_handle)
+    return _HistoryProfessionalHints(
+        frozenset(name_keys),
+        {key: tuple(values[:3]) for key, values in github_logins.items()},
+    )
 
 
 def schedule_professional_search_if_ready(
@@ -255,8 +343,20 @@ def schedule_professional_search_if_ready(
                     "exact-handle account to guide the professional search."
                 ),
                 created_at=now,
-            )
+        )
         return False
+    history_hints = _history_professional_hints(session, job=job, now=now)
+    indexed_hypotheses = list(enumerate(hypotheses))
+    indexed_hypotheses.sort(
+        key=lambda item: (
+            0 if anchor is not None and item[0] == 0 else 1,
+            0
+            if _normalized_name_key(item[1].full_name) in history_hints.name_keys
+            else 1,
+            item[0],
+        )
+    )
+    hypotheses = tuple(hypothesis for _, hypothesis in indexed_hypotheses)
     hypotheses = hypotheses[:maximum_names]
     exa_limit = _bounded_int(
         getattr(settings, "professional_search_max_results_per_query", 5),
@@ -290,6 +390,8 @@ def schedule_professional_search_if_ready(
         adaptive_plans_by_hypothesis[plan.hypothesis_index].append(plan)
 
     for index, hypothesis in enumerate(hypotheses):
+        hypothesis_name_key = _normalized_name_key(hypothesis.full_name)
+        uses_history_hint = hypothesis_name_key in history_hints.name_keys
         common_config: dict[str, object] = {
             "full_name": hypothesis.full_name,
             "root_handle": job.seed_identifier or "",
@@ -300,6 +402,8 @@ def schedule_professional_search_if_ready(
             "provenance_families": list(hypothesis.provenance_families),
             "budget_seconds": budget_seconds,
         }
+        if uses_history_hint:
+            common_config["history_revalidation"] = True
         parent_run_id = _parent_run_id(session, hypothesis.source_check_ids)
         suffix = stable_payload_hash(
             {
@@ -331,9 +435,13 @@ def schedule_professional_search_if_ready(
                     }
                 )
             else:
+                candidate_logins = _dedupe_casefolded(
+                    history_hints.github_logins_by_name.get(hypothesis_name_key, ())
+                    + plan.candidate_logins
+                )[:3]
                 query_config.update(
                     {
-                        "candidate_logins": list(plan.candidate_logins),
+                        "candidate_logins": list(candidate_logins),
                         "max_profiles": min(
                             github_limit,
                             plan.result_budget,
@@ -371,6 +479,22 @@ def schedule_professional_search_if_ready(
         ),
         created_at=now,
     )
+    hinted_hypothesis_count = sum(
+        _normalized_name_key(hypothesis.full_name) in history_hints.name_keys
+        for hypothesis in hypotheses
+    )
+    if hinted_hypothesis_count:
+        add_event(
+            session,
+            job_id=job.id,
+            event_type="history.professional_hints_applied",
+            message=(
+                f"Prioritized {hinted_hypothesis_count} freshly observed public name "
+                f"{'hypothesis' if hinted_hypothesis_count == 1 else 'hypotheses'} "
+                "using saved-run retrieval hints."
+            ),
+            created_at=now,
+        )
     return True
 
 

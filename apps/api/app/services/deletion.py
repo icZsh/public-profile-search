@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from apps.api.app.models.entities import (
@@ -33,7 +33,19 @@ from apps.api.app.services.jobs import owner_job
 
 def delete_job(session: Session, *, job_id: str, user_id: str, now) -> None:
     job = owner_job(session, job_id=job_id, user_id=user_id, for_update=True)
+    delete_locked_job(session, job=job, now=now)
+
+
+def delete_locked_job(session: Session, *, job: SearchJob, now) -> None:
+    """Delete one already-authorized, locked job and fence late worker writes."""
+
+    job_id = job.id
     job.acceptance_epoch += 1
+    session.execute(
+        update(SearchJob)
+        .where(SearchJob.refresh_of_job_id == job_id)
+        .values(refresh_of_job_id=None)
+    )
     report_ids = session.scalars(
         select(ReportRevision.id).where(ReportRevision.job_id == job_id)
     ).all()

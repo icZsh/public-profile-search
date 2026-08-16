@@ -64,7 +64,16 @@ class SearchJob(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(String(36), index=True)
-    retry_of_job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    refresh_of_job_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey(
+            "search_job.id",
+            name="fk_search_job_refresh_of_job_id_search_job",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
+    history_reuse_policy: Mapped[str | None] = mapped_column(String(64), nullable=True)
     normalized_identifier_hmac: Mapped[str] = mapped_column(String(64), index=True)
     canonical_input_url_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
     input_provider_id: Mapped[str] = mapped_column(String(80))
@@ -428,6 +437,7 @@ class OutboxMessage(Base):
     topic: Mapped[str] = mapped_column(String(80))
     dedupe_key: Mapped[str] = mapped_column(String(160), unique=True)
     payload: Mapped[dict[str, object]] = mapped_column(JSON)
+    priority: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
@@ -601,4 +611,27 @@ class JobDeletionTombstone(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
-Index("ix_outbox_undispatched", OutboxMessage.dispatched_at, OutboxMessage.created_at)
+Index(
+    "ix_outbox_undispatched",
+    OutboxMessage.dispatched_at,
+    OutboxMessage.priority,
+    OutboxMessage.created_at,
+    OutboxMessage.id,
+)
+Index(
+    "ix_search_job_owner_history",
+    SearchJob.user_id,
+    SearchJob.job_kind,
+    SearchJob.accepted_at,
+    SearchJob.id,
+)
+Index(
+    "ix_search_job_owner_exact_seed",
+    SearchJob.user_id,
+    SearchJob.job_kind,
+    SearchJob.normalized_identifier_hmac,
+    SearchJob.accepted_at,
+    SearchJob.id,
+)
+Index("ix_search_job_expiry", SearchJob.expires_at, SearchJob.id)
+Index("ix_search_job_refresh_lineage", SearchJob.refresh_of_job_id)

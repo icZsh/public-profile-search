@@ -8,20 +8,27 @@
     "start": "next start --hostname 0.0.0.0 --port 3500",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs && vitest run",
+    "test:rtl": "vitest run"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@public-profile-search/generated-api-client": "0.1.0",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.4",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
-    "typescript": "5.9.3"
+    "jsdom": "^30.0.1",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.10"
   }
 }

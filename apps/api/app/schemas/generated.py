@@ -536,6 +536,7 @@ class CreateFootprintJobRequest(BaseModel):
     search_mode: Literal["quick", "deep"] = "quick"
     synthesis_model: FootprintSynthesisModelValue | None = None
     locale: Literal["en-US", "zh-CN"] = "en-US"
+    history_policy: Literal["new_job", "prefer_existing"] = "new_job"
 
     @model_validator(mode="after")
     def require_deep_mode_for_synthesis_model(self) -> "CreateFootprintJobRequest":
@@ -602,6 +603,77 @@ class FootprintJobResponse(BaseModel):
     candidates_url: str
     accepted_at: datetime
     deadline_at: datetime
+    expires_at: datetime
+    refresh_of_job_id: UUID | None
+
+
+class FootprintHistorySeedResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["platform_identifier", "bare_handle"]
+    platform: FootprintPlatformValue | None
+    identifier: str = Field(min_length=1, max_length=64)
+
+
+class FootprintHistoryRunResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: UUID
+    status: Literal[
+        "queued",
+        "discovering",
+        "ready",
+        "ready_partial",
+        "no_candidates",
+        "failed",
+        "cancelled",
+    ]
+    search_mode: Literal["quick", "deep"]
+    synthesis_model: FootprintSynthesisModelValue | None
+    accepted_at: datetime
+    finished_at: datetime | None
+    expires_at: datetime
+    candidate_count: int = Field(ge=0)
+    result_available: bool
+    refresh_of_job_id: UUID | None
+
+
+class FootprintHistoryGroupResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    representative_job_id: UUID
+    seed: FootprintHistorySeedResponse
+    latest_run: FootprintHistoryRunResponse
+    run_count: int = Field(ge=1)
+
+
+class FootprintHistoryGroupPageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[FootprintHistoryGroupResponse]
+    next_cursor: str | None
+
+
+class FootprintHistoryRunPageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[FootprintHistoryRunResponse]
+    next_cursor: str | None
+
+
+class ClearFootprintHistoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int = Field(ge=0)
+    has_more: bool
+
+
+# OpenAPI schema-name aliases are kept alongside the route-facing Response names.
+FootprintHistorySeed = FootprintHistorySeedResponse
+FootprintHistoryRun = FootprintHistoryRunResponse
+FootprintHistoryGroup = FootprintHistoryGroupResponse
+FootprintHistoryGroupPage = FootprintHistoryGroupPageResponse
+FootprintHistoryRunPage = FootprintHistoryRunPageResponse
 
 
 class SelectFootprintAnchorRequest(BaseModel):

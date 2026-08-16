@@ -84,7 +84,8 @@ def _add_deep_synthesis_run(
             SearchJob(
                 id=job_id,
                 user_id="synthesis-test-user",
-                retry_of_job_id=None,
+                refresh_of_job_id=None,
+                history_reuse_policy=None,
                 normalized_identifier_hmac="a" * 64,
                 canonical_input_url_ciphertext=None,
                 input_provider_id="maigret_discovery_v1",
@@ -1159,16 +1160,22 @@ class _RecordingPublisher:
         self.professional_runs: list[tuple[str, str]] = []
         self.synthesis_runs: list[tuple[str, str]] = []
 
-    def send_provider_run(self, provider_run_id: str, task_id: str) -> None:
+    def send_provider_run(
+        self, provider_run_id: str, task_id: str, *, priority: int = 0
+    ) -> None:
         self.provider_runs.append((provider_run_id, task_id))
 
-    def send_maigret_scan_run(self, provider_run_id: str, task_id: str) -> None:
+    def send_maigret_scan_run(
+        self, provider_run_id: str, task_id: str, *, priority: int = 0
+    ) -> None:
         self.maigret_runs.append((provider_run_id, task_id))
 
     def send_professional_search_run(
         self,
         provider_run_id: str,
         task_id: str,
+        *,
+        priority: int = 0,
     ) -> None:
         self.professional_runs.append((provider_run_id, task_id))
 
@@ -1176,6 +1183,8 @@ class _RecordingPublisher:
         self,
         provider_run_id: str,
         task_id: str,
+        *,
+        priority: int = 0,
     ) -> None:
         self.synthesis_runs.append((provider_run_id, task_id))
 
@@ -1216,13 +1225,14 @@ def test_dispatcher_and_celery_use_grounded_synthesis_queue():
 def test_celery_publisher_sends_synthesis_task_to_dedicated_queue(monkeypatch):
     calls: list[dict[str, object]] = []
 
-    def fake_send_task(name, *, args, task_id, queue):
+    def fake_send_task(name, *, args, task_id, queue, priority):
         calls.append(
             {
                 "name": name,
                 "args": args,
                 "task_id": task_id,
                 "queue": queue,
+                "priority": priority,
             }
         )
 
@@ -1231,6 +1241,11 @@ def test_celery_publisher_sends_synthesis_task_to_dedicated_queue(monkeypatch):
         "run-1",
         "grounded-synthesis:run-1:generation:1",
     )
+    CeleryPublisher().send_grounded_synthesis_run(
+        "run-history",
+        "grounded-synthesis:run-history:generation:1",
+        priority=9,
+    )
 
     assert calls == [
         {
@@ -1238,7 +1253,15 @@ def test_celery_publisher_sends_synthesis_task_to_dedicated_queue(monkeypatch):
             "args": ["run-1"],
             "task_id": "grounded-synthesis:run-1:generation:1",
             "queue": "grounded_synthesis",
-        }
+            "priority": 9,
+        },
+        {
+            "name": "prototype.process_grounded_synthesis_run",
+            "args": ["run-history"],
+            "task_id": "grounded-synthesis:run-history:generation:1",
+            "queue": "grounded_synthesis",
+            "priority": 0,
+        },
     ]
 
 

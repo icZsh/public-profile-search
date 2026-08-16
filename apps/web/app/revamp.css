@@ -13,8 +13,7 @@
   border-radius: 0;
 }
 
-.traceSrOnly,
-.traceModePicker > legend {
+.traceSrOnly {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -77,11 +76,6 @@
   gap: 8px;
 }
 
-.traceOperatorDisclosure {
-  position: relative;
-}
-
-.traceOperatorDisclosure summary,
 .traceSecondaryButton,
 .traceTopbarPrimary,
 .traceTopbar .stopSearchButton {
@@ -99,37 +93,10 @@
   text-decoration: none;
   text-transform: none;
   letter-spacing: 0;
-  list-style: none;
 }
 
-.traceOperatorDisclosure summary::-webkit-details-marker {
-  display: none;
-}
-
-.traceOperatorDisclosure summary:hover,
-.traceOperatorDisclosure[open] summary,
 .traceSecondaryButton:hover {
   border-color: #17201c;
-  color: #17201c;
-}
-
-.traceOperatorDisclosure > div {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  display: grid;
-  width: min(320px, calc(100vw - 32px));
-  gap: 7px;
-  padding: 16px;
-  border: 1px solid #17201c;
-  background: #fffdf8;
-  box-shadow: 0 14px 34px rgb(23 32 28 / 12%);
-  color: #647168;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.traceOperatorDisclosure > div strong {
   color: #17201c;
 }
 
@@ -196,246 +163,224 @@
 
 .traceSearchCard {
   margin-top: 40px;
-  border: 1px solid #17201c;
-  background: #fffdf8;
-}
-
-.traceSearchInputRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.traceSearchInputRow input {
-  min-width: 0;
-  height: 68px;
   border: 0;
-  border-right: 1px solid #17201c;
-  padding: 0 22px;
+  background: transparent;
+}
+
+.traceUnifiedSearch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 64px;
+  border: 1px solid #a7aaa3;
+  border-radius: 999px;
+  padding: 7px 8px 7px 22px;
+  background: #fffdf8;
+  box-shadow: 0 1px 3px rgb(23 32 28 / 8%);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.traceUnifiedSearch:hover {
+  border-color: #7d877f;
+  box-shadow: 0 3px 12px rgb(23 32 28 / 9%);
+}
+
+.traceUnifiedSearch:focus-within {
+  border-color: #647168;
+  box-shadow: 0 0 0 3px rgb(142 175 36 / 24%), 0 4px 14px rgb(23 32 28 / 9%);
+}
+
+.traceUnifiedSearchDeep {
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 170px) auto auto;
+  border-color: #8eaf24;
+}
+
+.traceUnifiedSearch input {
+  min-width: 0;
+  height: 48px;
+  border: 0;
+  padding: 0 8px 0 0;
   background: transparent;
   color: #17201c;
-  font-size: 18px;
+  font-size: 17px;
   outline: none;
 }
 
-.traceSearchInputRow input::placeholder {
+.traceUnifiedSearch input::placeholder {
   color: #747a75;
   opacity: 1;
 }
 
-.traceSearchInputRow input:focus-visible {
-  box-shadow: inset 0 0 0 3px rgb(142 175 36 / 42%);
+.traceUnifiedSearch input:focus-visible {
+  outline: 0;
 }
 
-.traceSearchInputRow .tracePrimaryButton {
-  min-width: 164px;
-  height: 68px;
+.traceInlineModelPicker {
+  width: 100%;
+  min-width: 0;
+}
+
+.traceSearchCard .traceInlineModelPicker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
   border: 0;
-  padding: 0 28px;
-  font-size: 15px;
+  border-radius: 999px;
+  padding: 0 30px 0 12px;
+  background: #efeee8;
+  color: #17201c;
+  cursor: pointer;
+  font: 700 11px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.traceModePicker {
-  min-width: 0;
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.traceModeOptions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  border-top: 1px solid #17201c;
-  background: #d8d8cf;
-}
-
-.traceModeOption {
-  position: relative;
-  display: block;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.traceModeOption input {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  cursor: pointer;
-  opacity: 0;
-}
-
-.traceModeOptionBody {
-  display: block;
-  min-height: 178px;
-  padding: 20px 22px;
-  background: #f6f5ee;
-}
-
-.traceModeOptionSelected .traceModeOptionBody {
-  background: #fffdf8;
-  box-shadow: inset 0 3px 0 #d7ff53;
-}
-
-.traceModeOption input:focus-visible + .traceModeOptionBody {
-  outline: 3px solid #8eaf24;
-  outline-offset: -4px;
-}
-
-.traceModeOptionHeading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.traceModeOptionHeading strong {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 24px;
-  font-weight: 500;
-}
-
-.traceModeOptionHeading > small {
-  color: #647168;
-  font-size: 11px;
-}
-
-.traceSelectedBadge {
-  display: inline-block;
-  margin-left: 8px;
-  border: 1px solid #17201c;
-  padding: 3px 7px;
-  background: #d7ff53;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
-
-.traceModeOptionDescription {
-  display: block;
-  margin-top: 8px;
-  color: #3d4a41;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.traceModeFeatures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
-}
-
-.traceModeFeature {
-  border: 1px solid #d8d8cf;
-  padding: 4px 7px;
-  color: #647168;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.traceModeFeatureAccent {
-  border-color: #8eaf24;
-  background: rgb(215 255 83 / 22%);
-  color: #17201c;
-}
-
-.traceModeFeatureUnavailable {
-  border-style: dashed;
-  color: #909890;
-}
-
-.traceModelPicker {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: 18px;
-  align-items: center;
-  border-top: 1px solid #17201c;
-  padding: 12px 22px 14px;
-  background: #f6f5ee;
-}
-
-.traceModelPickerLabel {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.traceModelPickerLabel strong {
-  color: #17201c;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.traceModelPickerLabel span {
-  color: #647168;
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.traceModelControl {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.traceModelControl select {
-  width: 100%;
-  min-height: 38px;
-  border: 1px solid #a7aaa3;
-  padding: 0 34px 0 10px;
-  background: #fffdf8;
-  color: #17201c;
-  cursor: pointer;
-  font: 700 11px/1.3 Inter, ui-sans-serif, system-ui, sans-serif;
-}
-
-.traceModelControl select:focus-visible {
+.traceSearchCard .traceInlineModelPicker select:focus-visible {
   outline: 3px solid #8eaf24;
   outline-offset: 2px;
 }
 
-.traceModelControl select:disabled {
+.traceInlineModelPicker select:disabled {
   cursor: wait;
   opacity: 0.55;
 }
 
-.traceModelSummary {
+.traceDeepModeControl {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 3px 10px;
-  margin: 0;
-  color: #647168;
-  font-size: 9px;
-  line-height: 1.4;
 }
 
-.traceModelSummary span {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.traceModelSummary strong {
+.traceApp .traceDeepModeToggle {
+  display: inline-flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 15px;
+  background: #efeee8;
   color: #3d4a41;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.traceModelSummary small {
-  font-size: inherit;
+.traceDeepModeToggle svg {
+  flex: 0 0 auto;
+  color: #647168;
+}
+
+.traceApp .traceDeepModeToggle:hover:not(:disabled) {
+  background: #e5e3da;
+  color: #17201c;
+}
+
+.traceApp .traceDeepModeToggle[aria-pressed="true"],
+.traceApp .traceDeepModeToggle[aria-pressed="true"]:hover:not(:disabled) {
+  background: #d7ff53;
+  color: #17201c;
+}
+
+.traceDeepModeToggle[aria-pressed="true"] svg {
+  color: #596f13;
+}
+
+.traceApp .traceDeepModeToggle:focus-visible,
+.traceApp .traceSearchSubmit:focus-visible {
+  outline: 3px solid #8eaf24;
+  outline-offset: 3px;
+}
+
+.traceDeepModeToggle:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.traceSearchModeTooltip {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 12px);
+  right: -50px;
+  display: grid;
+  visibility: hidden;
+  width: min(310px, calc(100vw - 32px));
+  gap: 9px;
+  border: 1px solid rgb(100 113 104 / 24%);
+  border-radius: 12px;
+  padding: 12px 13px;
+  background: rgb(255 253 248 / 82%);
+  box-shadow: 0 14px 32px rgb(23 32 28 / 12%);
+  color: #17201c;
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: auto;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
+  backdrop-filter: blur(14px) saturate(115%);
+}
+
+.traceSearchModeTooltip > span {
+  display: block;
+}
+
+.traceSearchModeTooltip strong {
+  display: inline-block;
+  min-width: 44px;
+  color: #596f13;
+  font-weight: 800;
+}
+
+.traceSearchModeTooltipOpen {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.traceApp .traceSearchSubmit {
+  display: inline-flex;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: #d7ff53;
+  color: #17201c;
+  cursor: pointer;
+}
+
+.traceSearchSubmit svg {
+  flex: 0 0 auto;
+}
+
+.traceSearchBusySpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgb(23 32 28 / 34%);
+  border-top-color: #17201c;
+  border-radius: 50%;
+  animation: trace-search-spin 720ms linear infinite;
+}
+
+@keyframes trace-search-spin {
+  to { transform: rotate(360deg); }
 }
 
 .traceFormError {
-  margin: 0;
-  border-top: 1px solid #a64231;
+  width: min(620px, 100%);
+  margin: 16px auto 0;
+  border: 1px solid #a64231;
+  border-radius: 12px;
   padding: 12px 18px;
   background: #fbf3ef;
   color: #a64231;
@@ -1074,6 +1019,57 @@
   border-color: #8eaf24;
   background: rgb(215 255 83 / 12%);
   color: #3d4a41;
+}
+
+.traceSavedSearchMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(1108px, calc(100% - 48px));
+  margin: 18px auto 0;
+  border: 1px solid #17201c;
+  padding: 14px 16px;
+  background: #fffdf8;
+}
+
+.traceSavedSearchMeta > div {
+  display: grid;
+  gap: 3px;
+}
+
+.traceSavedSearchMeta > div > span {
+  color: #647168;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.traceSavedSearchMeta > div > strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.traceSavedSearchMeta > div > small {
+  color: #647168;
+  font-size: 9px;
+}
+
+.traceSavedSearchMeta > .tracePrimaryButton {
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  font-size: 10px;
+}
+
+.traceSavedSearchMeta > p {
+  flex-basis: 100%;
+  margin: 0;
+  color: #a64231;
+  font-size: 10px;
 }
 
 .traceJobFooter {
@@ -1933,6 +1929,709 @@
   font-size: 11px;
 }
 
+/* Homepage search history */
+
+.traceHistoryTrigger {
+  z-index: 35;
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: #3d4a41;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.traceHistoryTriggerIcon {
+  flex: 0 0 auto;
+  color: #647168;
+  transition: color 140ms ease;
+}
+
+.traceHistoryTrigger:hover {
+  background: transparent;
+  color: #17201c;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.traceHistoryTrigger:hover .traceHistoryTriggerIcon,
+.traceHistoryTrigger[aria-expanded="true"] .traceHistoryTriggerIcon {
+  color: #8eaf24;
+}
+
+.traceHistoryTrigger:focus-visible,
+.traceHistoryDrawer button:focus-visible,
+.traceHistoryDrawer a:focus-visible,
+.traceHistoryDrawer input:focus-visible {
+  outline: 3px solid #8eaf24;
+  outline-offset: 2px;
+}
+
+.traceHistoryLayer {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  pointer-events: none;
+}
+
+.traceHistoryLayer-modal {
+  pointer-events: auto;
+}
+
+.traceHistoryDrawer {
+  display: flex;
+  width: min(360px, calc(100vw - 24px));
+  height: 100dvh;
+  flex-direction: column;
+  border-right: 1px solid #17201c;
+  background: #f3f0e8;
+  box-shadow: 18px 0 44px rgb(23 32 28 / 20%);
+  outline: 0;
+  pointer-events: auto;
+  animation: trace-history-in 180ms ease-out;
+}
+
+@keyframes trace-history-in {
+  from { transform: translateX(-18px); opacity: 0.65; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.traceHistoryHeader {
+  display: flex;
+  min-height: 86px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #17201c;
+  padding: 17px 16px 15px 20px;
+  background: #fffdf8;
+}
+
+.traceHistoryHeader > div {
+  display: grid;
+  gap: 5px;
+}
+
+.traceHistoryHeader span,
+.traceHistorySearch label,
+.traceHistoryToolbar > span {
+  color: #647168;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.traceHistoryHeader h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.traceHistoryClose {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #d8d8cf;
+  background: transparent;
+  color: #17201c;
+  cursor: pointer;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.traceHistoryClose:hover {
+  border-color: #17201c;
+  background: #f3f0e8;
+}
+
+.traceHistorySearch {
+  display: grid;
+  gap: 7px;
+  border-bottom: 1px solid #d8d8cf;
+  padding: 15px 20px;
+  background: #fffdf8;
+}
+
+.traceHistorySearch input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #9aa39b;
+  padding: 0 11px;
+  background: #f8f7f2;
+  color: #17201c;
+  outline: 0;
+  font-size: 13px;
+}
+
+.traceHistorySearch input::placeholder {
+  color: #7d877f;
+}
+
+.traceHistoryToolbar {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #d8d8cf;
+  padding: 0 20px;
+}
+
+.traceHistoryToolbar button {
+  border: 0;
+  padding: 5px 0;
+  background: transparent;
+  color: #a64231;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.traceHistoryToolbar button:disabled,
+.traceHistoryDrawer button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.traceHistoryNotice {
+  min-height: 0;
+  margin: 0;
+  padding: 0 20px;
+  background: rgb(215 255 83 / 16%);
+  color: #3d4a41;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.traceHistoryNotice:not(:empty) {
+  min-height: 34px;
+  border-bottom: 1px solid #bfcf83;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.traceHistoryContent {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.traceHistoryGroups,
+.traceHistoryRuns ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.traceHistoryGroup {
+  border-bottom: 1px solid #c9c7bd;
+}
+
+.traceHistoryGroupToggle {
+  display: grid;
+  width: 100%;
+  min-height: 76px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  padding: 12px 16px 12px 20px;
+  background: #fffdf8;
+  color: #17201c;
+  cursor: pointer;
+  text-align: left;
+}
+
+.traceHistoryGroupToggle:hover,
+.traceHistoryGroupToggle[aria-expanded="true"] {
+  background: #f8f7f2;
+}
+
+.traceHistoryGroupIdentity,
+.traceHistoryGroupLatest,
+.traceHistoryRunMeta {
+  display: grid;
+}
+
+.traceHistoryGroupIdentity {
+  min-width: 0;
+  gap: 4px;
+}
+
+.traceHistoryGroupIdentity strong {
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traceHistoryGroupIdentity small,
+.traceHistoryGroupLatest time,
+.traceHistoryRunMeta time,
+.traceHistoryRunMeta small {
+  color: #647168;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.traceHistoryGroupLatest {
+  grid-template-columns: minmax(0, 86px) 18px;
+  gap: 6px;
+  align-items: center;
+  text-align: right;
+}
+
+.traceHistoryGroupLatest i {
+  color: #8eaf24;
+  font-size: 19px;
+  font-style: normal;
+  text-align: center;
+}
+
+.traceHistoryRuns {
+  border-top: 1px solid #d8d8cf;
+  background: #e8e5da;
+}
+
+.traceHistoryRun {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border-bottom: 1px solid #d3d0c6;
+  padding: 13px 16px 13px 20px;
+}
+
+.traceHistoryRunMeta {
+  min-width: 0;
+  gap: 3px;
+}
+
+.traceHistoryRunMeta > strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.traceHistoryStatus {
+  width: max-content;
+  border: 1px solid #aeb4ac;
+  padding: 2px 5px;
+  color: #3d4a41;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.traceHistoryStatus-ready,
+.traceHistoryStatus-ready_partial {
+  border-color: #8eaf24;
+  background: rgb(215 255 83 / 18%);
+}
+
+.traceHistoryStatus-failed,
+.traceHistoryStatus-cancelled {
+  border-color: #c9aa9f;
+  color: #a64231;
+}
+
+.traceHistoryRunActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.traceHistoryRunActions a,
+.traceHistoryRunActions button,
+.traceHistoryMoreRuns,
+.traceHistoryLoadMore,
+.traceHistoryState button {
+  min-width: 56px;
+  border: 1px solid #8f978f;
+  padding: 5px 7px;
+  background: #fffdf8;
+  color: #17201c;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+}
+
+.traceHistoryRunActions a:hover,
+.traceHistoryRunActions button:hover:not(:disabled),
+.traceHistoryMoreRuns:hover:not(:disabled),
+.traceHistoryLoadMore:hover:not(:disabled),
+.traceHistoryState button:hover {
+  border-color: #17201c;
+  background: #d7ff53;
+}
+
+.traceHistoryRunActions .traceHistoryDelete {
+  color: #a64231;
+}
+
+.traceHistoryMoreRuns,
+.traceHistoryLoadMore {
+  display: block;
+  width: calc(100% - 40px);
+  min-height: 34px;
+  margin: 12px 20px;
+}
+
+.traceHistoryRunsState,
+.traceHistoryState,
+.traceHistoryPaginationError {
+  margin: 0;
+  padding: 24px 20px;
+  color: #647168;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.traceHistoryRunsState {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.traceHistoryRunsState button {
+  margin-left: 9px;
+}
+
+.traceHistoryState {
+  display: grid;
+  gap: 8px;
+  min-height: 150px;
+  align-content: center;
+  justify-items: start;
+}
+
+.traceHistoryState strong {
+  color: #17201c;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.traceHistoryState p {
+  margin: 0;
+}
+
+.traceHistoryPaginationError {
+  padding-top: 10px;
+  padding-bottom: 0;
+  color: #a64231;
+}
+
+/* Compact sidebar treatment, adapted from the selected history reference. */
+
+.traceHistoryDrawer {
+  width: min(372px, calc(100vw - 20px));
+  border-right: 1px solid #c9c7bd;
+  background: #f3f0e8;
+  box-shadow: 18px 0 42px rgb(23 32 28 / 18%);
+  color: #17201c;
+}
+
+.traceHistoryHeader {
+  min-height: 96px;
+  align-items: center;
+  border-bottom: 0;
+  padding: 24px 18px 12px 22px;
+  background: transparent;
+}
+
+.traceHistoryHeader > div {
+  gap: 7px;
+}
+
+.traceHistoryHeader span,
+.traceHistorySearch label,
+.traceHistoryToolbar > span {
+  color: #647168;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.traceHistoryHeader h2 {
+  color: #17201c;
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.traceHistoryClose {
+  width: auto;
+  height: auto;
+  border: 0;
+  padding: 7px 4px 7px 10px;
+  background: transparent;
+  color: #647168;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.traceHistoryClose:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #17201c;
+}
+
+.traceHistorySearch {
+  gap: 8px;
+  border-bottom: 0;
+  padding: 8px 16px 14px 22px;
+  background: transparent;
+}
+
+.traceHistoryDrawer .traceHistorySearch input {
+  height: 42px;
+  border: 1px solid #d8d8cf;
+  border-radius: 14px;
+  padding: 0 13px;
+  background: #fffdf8;
+  color: #17201c;
+  font-size: 13px;
+}
+
+.traceHistorySearch input::placeholder {
+  color: #7d877f;
+}
+
+.traceHistoryDrawer .traceHistorySearch input:focus-visible {
+  border-color: #8eaf24;
+  outline-color: #8eaf24;
+}
+
+.traceHistoryToolbar {
+  min-height: 44px;
+  border-bottom: 0;
+  padding: 0 22px;
+}
+
+.traceHistoryToolbar button {
+  color: #647168;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.traceHistoryToolbar button:hover:not(:disabled) {
+  color: #17201c;
+}
+
+.traceHistoryNotice {
+  margin: 0 10px;
+  padding-right: 12px;
+  padding-left: 12px;
+  border-radius: 10px;
+  background: rgb(215 255 83 / 16%);
+  color: #3d4a41;
+}
+
+.traceHistoryNotice:not(:empty) {
+  border: 1px solid #bfcf83;
+}
+
+.traceHistoryContent {
+  padding: 0 10px 18px;
+  scrollbar-color: #c9c7bd transparent;
+  scrollbar-width: thin;
+}
+
+.traceHistoryGroup {
+  margin: 2px 0;
+  border-bottom: 0;
+}
+
+.traceHistoryDrawer .traceHistoryGroupToggle {
+  min-height: 64px;
+  grid-template-columns: minmax(0, 1fr) minmax(60px, 84px);
+  gap: 12px;
+  border-radius: 16px;
+  padding: 10px 12px 10px 14px;
+  background: transparent;
+  color: #17201c;
+}
+
+.traceHistoryGroupToggle:hover,
+.traceHistoryGroupToggle[aria-expanded="true"] {
+  background: #dedbd2;
+}
+
+.traceHistoryGroupIdentity {
+  gap: 5px;
+}
+
+.traceHistoryGroupIdentity strong {
+  color: #17201c;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.traceHistoryGroupIdentity small,
+.traceHistoryGroupLatest time,
+.traceHistoryRunMeta time,
+.traceHistoryRunMeta small {
+  color: #647168;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.traceHistoryGroupLatest {
+  display: block;
+  text-align: right;
+}
+
+.traceHistoryGroupLatest time {
+  display: block;
+}
+
+.traceHistoryRuns {
+  margin: 2px 4px 10px 38px;
+  border-top: 0;
+  background: transparent;
+}
+
+.traceHistoryRun {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  margin: 2px 0;
+  border-bottom: 0;
+  border-radius: 12px;
+  padding: 10px 11px;
+  color: #3d4a41;
+}
+
+.traceHistoryRun:hover,
+.traceHistoryRun:focus-within {
+  background: #e8e5da;
+}
+
+.traceHistoryRunMeta {
+  gap: 3px;
+}
+
+.traceHistoryRunMeta > strong {
+  color: #17201c;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.traceHistoryStatus {
+  border: 0;
+  padding: 0;
+  color: #647168;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.traceHistoryStatus-ready,
+.traceHistoryStatus-ready_partial {
+  background: transparent;
+  color: #6e8e0d;
+}
+
+.traceHistoryStatus-failed,
+.traceHistoryStatus-cancelled {
+  color: #a64231;
+}
+
+.traceHistoryRunActions {
+  flex-direction: row;
+  align-items: center;
+  gap: 13px;
+}
+
+.traceHistoryRunActions a,
+.traceHistoryRunActions button,
+.traceHistoryMoreRuns,
+.traceHistoryLoadMore,
+.traceHistoryState button {
+  min-width: 0;
+  border: 0;
+  padding: 3px 0;
+  background: transparent;
+  color: #647168;
+  font-size: 9px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.traceHistoryRunActions a:hover,
+.traceHistoryRunActions button:hover:not(:disabled),
+.traceHistoryMoreRuns:hover:not(:disabled),
+.traceHistoryLoadMore:hover:not(:disabled),
+.traceHistoryState button:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #17201c;
+}
+
+.traceHistoryRunActions .traceHistoryDelete {
+  color: #a64231;
+}
+
+.traceHistoryMoreRuns,
+.traceHistoryLoadMore {
+  width: auto;
+  min-height: 30px;
+  margin: 7px 0 2px 11px;
+  color: #7d877f;
+  font-size: 12px;
+}
+
+.traceHistoryLoadMore {
+  margin-left: 54px;
+}
+
+.traceHistoryRunsState,
+.traceHistoryState,
+.traceHistoryPaginationError {
+  color: #647168;
+}
+
+.traceHistoryRunsState {
+  padding: 12px 11px;
+}
+
+.traceHistoryState {
+  padding: 28px 12px;
+}
+
+.traceHistoryState strong {
+  color: #17201c;
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.traceHistoryPaginationError {
+  color: #a64231;
+}
+
 @media (max-width: 1000px) {
   .traceRunningGrid {
     grid-template-columns: 1fr;
@@ -1951,12 +2650,23 @@
 }
 
 @media (max-width: 720px) {
+  .traceHistoryDrawer {
+    width: 94vw;
+  }
+
   .traceTopbar {
     min-height: 56px;
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
     padding: 16px;
+  }
+
+  .traceHome .traceTopbar {
+    min-height: 56px;
+    align-items: center;
+    flex-direction: row;
+    padding: 0 16px;
   }
 
   .traceTopbarIdentity,
@@ -1976,15 +2686,6 @@
     flex-wrap: wrap;
   }
 
-  .traceTopbarActions .traceOperatorDisclosure {
-    margin-right: auto;
-  }
-
-  .traceOperatorDisclosure > div {
-    right: auto;
-    left: 0;
-  }
-
   .traceSearchIntro {
     width: min(100% - 32px, 820px);
     padding: 48px 0 54px;
@@ -1994,30 +2695,53 @@
     font-size: clamp(43px, 13vw, 58px);
   }
 
-  .traceSearchInputRow,
-  .traceModeOptions,
   .tracePrinciples,
   .traceCheckpointGrid {
     grid-template-columns: 1fr;
   }
 
-  .traceSearchInputRow input {
-    border-right: 0;
-    border-bottom: 1px solid #17201c;
+  .traceUnifiedSearch {
+    min-height: 58px;
+    gap: 4px;
+    padding: 5px 5px 5px 12px;
   }
 
-  .traceSearchInputRow .tracePrimaryButton {
-    width: 100%;
+  .traceUnifiedSearchDeep {
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 100px) auto auto;
   }
 
-  .traceModeOptionBody {
-    min-height: 0;
+  .traceUnifiedSearch input {
+    height: 46px;
+    min-width: 40px;
+    padding-right: 4px;
+    font-size: 15px;
   }
 
-  .traceModelPicker {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 12px 16px 14px;
+  .traceSearchCard .traceInlineModelPicker select {
+    width: clamp(72px, 25vw, 100px);
+    min-height: 40px;
+    padding-right: 24px;
+    padding-left: 9px;
+    font-size: 10px;
+  }
+
+  .traceApp .traceDeepModeToggle {
+    min-height: 44px;
+    gap: 4px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .traceApp .traceSearchSubmit {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    flex-basis: 44px;
+  }
+
+  .traceSearchModeTooltip {
+    right: -44px;
+    width: min(288px, calc(100vw - 32px));
   }
 
   .tracePrinciples {
@@ -2093,6 +2817,7 @@
 
   .traceQuickCta,
   .traceReviewNotice,
+  .traceSavedSearchMeta,
   .traceJobFooter {
     align-items: flex-start;
     flex-direction: column;
@@ -2100,6 +2825,7 @@
 
   .traceQuickCta button,
   .traceQuickModelChoice,
+  .traceSavedSearchMeta > .tracePrimaryButton,
   .traceJobFooter .tracePrimaryButton {
     width: 100%;
   }
@@ -2111,9 +2837,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .traceHistoryDrawer {
+    animation: none;
+  }
+
   .traceStepStatusRing,
   .traceStepProgressRing,
   .traceStepProgressRingValue,
+  .traceSearchModeTooltip,
+  .traceSearchBusySpinner,
+  .traceUnifiedSearch,
   .traceCoverageTrack > span {
     animation: none;
     transition: none;
@@ -2121,7 +2854,10 @@
 }
 
 @media print {
+  .traceHistoryTrigger,
+  .traceHistoryLayer,
   .traceTopbar,
+  .traceSavedSearchMeta,
   .traceJobFooter,
   .traceReviewNotice,
   .traceReviewActions,

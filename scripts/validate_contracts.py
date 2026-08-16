@@ -65,9 +65,13 @@ def _assert_security_and_headers(openapi: dict[str, Any]) -> None:
         ("/v1/search-jobs/{job_id}/events", "get"),
         ("/v1/search-jobs/{job_id}/brief", "get"),
         ("/v1/search-jobs/{job_id}/evidence", "get"),
+        ("/v1/footprint-jobs", "get"),
         ("/v1/footprint-jobs", "post"),
+        ("/v1/footprint-jobs", "delete"),
         ("/v1/footprint-jobs/{job_id}", "get"),
         ("/v1/footprint-jobs/{job_id}", "delete"),
+        ("/v1/footprint-jobs/{job_id}/history", "get"),
+        ("/v1/footprint-jobs/{job_id}/refresh", "post"),
         ("/v1/footprint-jobs/{job_id}/cancel", "post"),
         ("/v1/footprint-jobs/{job_id}/candidates", "get"),
         ("/v1/footprint-jobs/{job_id}/anchor", "post"),
@@ -162,6 +166,8 @@ def main() -> None:
         "/v1/search-jobs/{job_id}/brief",
         "/v1/footprint-jobs",
         "/v1/footprint-jobs/{job_id}",
+        "/v1/footprint-jobs/{job_id}/history",
+        "/v1/footprint-jobs/{job_id}/refresh",
         "/v1/footprint-jobs/{job_id}/cancel",
         "/v1/footprint-jobs/{job_id}/candidates",
         "/v1/footprint-jobs/{job_id}/anchor",
@@ -178,9 +184,13 @@ def main() -> None:
         (path, method): operation for path, method, operation in _operations(openapi)
     }
     expected_footprint_operations = {
+        ("/v1/footprint-jobs", "get"): "listFootprintHistory",
         ("/v1/footprint-jobs", "post"): "createFootprintJob",
+        ("/v1/footprint-jobs", "delete"): "clearFootprintHistory",
         ("/v1/footprint-jobs/{job_id}", "get"): "getFootprintJob",
         ("/v1/footprint-jobs/{job_id}", "delete"): "deleteFootprintJob",
+        ("/v1/footprint-jobs/{job_id}/history", "get"): "listFootprintJobHistory",
+        ("/v1/footprint-jobs/{job_id}/refresh", "post"): "refreshFootprintJob",
         ("/v1/footprint-jobs/{job_id}/cancel", "post"): "cancelFootprintJob",
         ("/v1/footprint-jobs/{job_id}/candidates", "get"): "listFootprintCandidates",
         ("/v1/footprint-jobs/{job_id}/anchor", "post"): "selectFootprintAnchor",
@@ -196,6 +206,26 @@ def main() -> None:
         "/v1/footprint-jobs",
         actual_operations[("/v1/footprint-jobs", "post")],
     )
+    assert "Idempotency-Key" in _parameter_names(
+        openapi,
+        "/v1/footprint-jobs/{job_id}/refresh",
+        actual_operations[("/v1/footprint-jobs/{job_id}/refresh", "post")],
+    )
+    assert _parameter_names(
+        openapi,
+        "/v1/footprint-jobs",
+        actual_operations[("/v1/footprint-jobs", "get")],
+    ) >= {"X-Prototype-User", "q", "cursor", "limit"}
+    assert _parameter_names(
+        openapi,
+        "/v1/footprint-jobs/{job_id}/history",
+        actual_operations[("/v1/footprint-jobs/{job_id}/history", "get")],
+    ) >= {"X-Prototype-User", "job_id", "cursor", "limit"}
+    assert _parameter_names(
+        openapi,
+        "/v1/footprint-jobs",
+        actual_operations[("/v1/footprint-jobs", "delete")],
+    ) >= {"X-Prototype-User", "limit"}
     for ref in _refs(openapi):
         _resolve_ref(openapi, ref)
 
@@ -319,6 +349,19 @@ def main() -> None:
     synthesis_dependency = create_footprint_job["dependentSchemas"]["synthesis_model"]
     assert synthesis_dependency["required"] == ["search_mode"]
     assert synthesis_dependency["properties"]["search_mode"]["const"] == "deep"
+    history_policy = create_footprint_job["properties"]["history_policy"]
+    assert history_policy["enum"] == ["new_job", "prefer_existing"]
+    assert history_policy["default"] == "new_job"
+    assert "history_policy" not in create_footprint_job["required"]
+
+    footprint_create_responses = actual_operations[("/v1/footprint-jobs", "post")]["responses"]
+    assert {
+        status: footprint_create_responses[status]["content"]["application/json"]["schema"]["$ref"]
+        for status in ("200", "202")
+    } == {
+        "200": "#/components/schemas/FootprintJob",
+        "202": "#/components/schemas/FootprintJob",
+    }
 
     footprint_job = schemas["FootprintJob"]
     assert {
@@ -331,6 +374,8 @@ def main() -> None:
         "catalog",
         "events_url",
         "candidates_url",
+        "expires_at",
+        "refresh_of_job_id",
     } <= set(footprint_job["required"])
     assert footprint_job["properties"]["status"]["enum"] == [
         "queued",
@@ -365,6 +410,109 @@ def main() -> None:
         {"$ref": "#/components/schemas/FootprintDeepProgress"},
         {"type": "null"},
     ]
+    assert footprint_job["properties"]["expires_at"] == {
+        "type": "string",
+        "format": "date-time",
+    }
+    assert footprint_job["properties"]["refresh_of_job_id"] == {
+        "type": ["string", "null"],
+        "format": "uuid",
+    }
+
+    history_seed = schemas["FootprintHistorySeed"]
+    assert set(history_seed["required"]) == {"kind", "platform", "identifier"}
+    assert history_seed["properties"]["kind"]["enum"] == [
+        "platform_identifier",
+        "bare_handle",
+    ]
+    assert history_seed["properties"]["platform"]["type"] == ["string", "null"]
+
+    history_run = schemas["FootprintHistoryRun"]
+    assert set(history_run["required"]) == {
+        "job_id",
+        "status",
+        "search_mode",
+        "synthesis_model",
+        "accepted_at",
+        "finished_at",
+        "expires_at",
+        "candidate_count",
+        "result_available",
+        "refresh_of_job_id",
+    }
+    assert history_run["properties"]["search_mode"]["enum"] == ["quick", "deep"]
+    assert history_run["properties"]["synthesis_model"]["anyOf"] == [
+        {"$ref": "#/components/schemas/FootprintSynthesisModel"},
+        {"type": "null"},
+    ]
+    assert history_run["properties"]["finished_at"] == {
+        "type": ["string", "null"],
+        "format": "date-time",
+    }
+    assert history_run["properties"]["candidate_count"]["minimum"] == 0
+
+    history_group = schemas["FootprintHistoryGroup"]
+    assert set(history_group["required"]) == {
+        "representative_job_id",
+        "seed",
+        "latest_run",
+        "run_count",
+    }
+    assert history_group["properties"]["seed"]["$ref"] == (
+        "#/components/schemas/FootprintHistorySeed"
+    )
+    assert history_group["properties"]["latest_run"]["$ref"] == (
+        "#/components/schemas/FootprintHistoryRun"
+    )
+    assert history_group["properties"]["run_count"]["minimum"] == 1
+
+    for page_name, item_ref in (
+        ("FootprintHistoryGroupPage", "#/components/schemas/FootprintHistoryGroup"),
+        ("FootprintHistoryRunPage", "#/components/schemas/FootprintHistoryRun"),
+    ):
+        page = schemas[page_name]
+        assert set(page["required"]) == {"items", "next_cursor"}
+        assert page["properties"]["items"]["items"]["$ref"] == item_ref
+        assert page["properties"]["next_cursor"]["type"] == ["string", "null"]
+
+    clear_history = schemas["ClearFootprintHistoryResponse"]
+    assert set(clear_history["required"]) == {"deleted_count", "has_more"}
+    assert clear_history["properties"]["deleted_count"]["minimum"] == 0
+    assert clear_history["properties"]["has_more"]["type"] == "boolean"
+
+    history_response_refs = {
+        ("/v1/footprint-jobs", "get", "200"): ("#/components/schemas/FootprintHistoryGroupPage"),
+        ("/v1/footprint-jobs", "delete", "200"): (
+            "#/components/schemas/ClearFootprintHistoryResponse"
+        ),
+        ("/v1/footprint-jobs/{job_id}/history", "get", "200"): (
+            "#/components/schemas/FootprintHistoryRunPage"
+        ),
+        ("/v1/footprint-jobs/{job_id}/refresh", "post", "202"): (
+            "#/components/schemas/FootprintJob"
+        ),
+    }
+    for (path, method, status), expected_ref in history_response_refs.items():
+        assert (
+            actual_operations[(path, method)]["responses"][status]["content"]["application/json"][
+                "schema"
+            ]["$ref"]
+            == expected_ref
+        )
+
+    generated_history_fragments = {
+        'export type FootprintHistoryPolicy = "new_job" | "prefer_existing";',
+        "history_policy?: FootprintHistoryPolicy;",
+        "expires_at: string;",
+        "refresh_of_job_id: string | null;",
+        "export interface FootprintHistorySeed",
+        "export interface FootprintHistoryRun",
+        "export interface FootprintHistoryGroup",
+        "export interface FootprintHistoryGroupPage",
+        "export interface FootprintHistoryRunPage",
+        "export interface ClearFootprintHistoryResponse",
+    }
+    assert all(fragment in generated_typescript for fragment in generated_history_fragments)
     deep_progress = schemas["FootprintDeepProgress"]
     assert set(deep_progress["required"]) == {
         "current_phase",

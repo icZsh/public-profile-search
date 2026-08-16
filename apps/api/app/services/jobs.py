@@ -121,7 +121,8 @@ def create_job(
     job = SearchJob(
         id=job_id,
         user_id=user_id,
-        retry_of_job_id=None,
+        refresh_of_job_id=None,
+        history_reuse_policy=None,
         normalized_identifier_hmac=identifier_hmac,
         canonical_input_url_ciphertext=encrypt_value(
             target.canonical_url,

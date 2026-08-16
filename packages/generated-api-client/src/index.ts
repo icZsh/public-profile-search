@@ -107,6 +107,8 @@ export type FootprintPlatform =
 
 export type FootprintSearchMode = "quick" | "deep";
 
+export type FootprintHistoryPolicy = "new_job" | "prefer_existing";
+
 export type FootprintSynthesisModel =
   | "openai/gpt-5.6-luna"
   | "openai/gpt-5.4-nano"
@@ -163,6 +165,7 @@ export interface CreateFootprintJobRequest {
   search_mode?: FootprintSearchMode;
   synthesis_model?: FootprintSynthesisModel;
   locale?: "en-US" | "zh-CN";
+  history_policy?: FootprintHistoryPolicy;
 }
 
 export type FootprintJobStatus =
@@ -226,6 +229,49 @@ export interface FootprintJob {
   candidates_url: string;
   accepted_at: string;
   deadline_at: string;
+  expires_at: string;
+  refresh_of_job_id: string | null;
+}
+
+export interface FootprintHistorySeed {
+  kind: "platform_identifier" | "bare_handle";
+  platform: FootprintPlatform | null;
+  identifier: string;
+}
+
+export interface FootprintHistoryRun {
+  job_id: string;
+  status: FootprintJobStatus;
+  search_mode: FootprintSearchMode;
+  synthesis_model: FootprintSynthesisModel | null;
+  accepted_at: string;
+  finished_at: string | null;
+  expires_at: string;
+  candidate_count: number;
+  result_available: boolean;
+  refresh_of_job_id: string | null;
+}
+
+export interface FootprintHistoryGroup {
+  representative_job_id: string;
+  seed: FootprintHistorySeed;
+  latest_run: FootprintHistoryRun;
+  run_count: number;
+}
+
+export interface FootprintHistoryGroupPage {
+  items: FootprintHistoryGroup[];
+  next_cursor: string | null;
+}
+
+export interface FootprintHistoryRunPage {
+  items: FootprintHistoryRun[];
+  next_cursor: string | null;
+}
+
+export interface ClearFootprintHistoryResponse {
+  deleted_count: number;
+  has_more: boolean;
 }
 
 export interface SelectFootprintAnchorRequest {

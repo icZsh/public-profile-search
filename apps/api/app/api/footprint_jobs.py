@@ -13,9 +13,12 @@ from apps.api.app.core.errors import ApiError
 from apps.api.app.models.entities import JobEvent
 from apps.api.app.schemas.generated import (
     CandidateListResponse,
+    ClearFootprintHistoryResponse,
     CreateFootprintJobRequest,
     EvidenceListResponse,
     FootprintBriefResponse,
+    FootprintHistoryGroupPageResponse,
+    FootprintHistoryRunPageResponse,
     FootprintJobResponse,
     SelectFootprintAnchorRequest,
     SelectFootprintAnchorResponse,
@@ -30,26 +33,53 @@ from apps.api.app.services.discovery_jobs import (
     create_footprint_job,
     footprint_job_response,
     owner_footprint_job,
+    refresh_footprint_job,
 )
 from apps.api.app.services.footprint_cancellation import cancel_footprint_job
 from apps.api.app.services.footprint_reports import (
     get_footprint_brief,
     get_footprint_evidence,
 )
+from apps.api.app.services.history import (
+    clear_terminal_history,
+    list_history_groups,
+    list_related_history_runs,
+)
 from apps.api.app.services.maigret_runs import finalize_discovery_if_complete
 
 router = APIRouter(prefix="/v1/footprint-jobs", tags=["footprint-jobs"])
+
+
+@router.get("", response_model=FootprintHistoryGroupPageResponse)
+def get_discovery_history(
+    request: Request,
+    q: str | None = Query(default=None, max_length=160),
+    cursor: str | None = Query(default=None, min_length=1, max_length=512),
+    limit: int = Query(default=20, ge=1, le=100),
+    auth: AuthContext = Depends(require_prototype_auth),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    return list_history_groups(
+        session,
+        user_id=auth.user_id,
+        now=request.app.state.clock.now(),
+        q=q,
+        cursor=cursor,
+        limit=limit,
+        result_reads_enabled=request.app.state.settings.prototype_report_reads_enabled,
+    )
 
 
 @router.post("", response_model=FootprintJobResponse, status_code=202)
 def create_discovery_job(
     body: CreateFootprintJobRequest,
     request: Request,
+    response: Response,
     idempotency_key: str = Header(alias="Idempotency-Key"),
     auth: AuthContext = Depends(require_prototype_auth),
     session: Session = Depends(get_session),
 ) -> dict[str, object]:
-    job, _created = create_footprint_job(
+    job, created = create_footprint_job(
         session,
         settings=request.app.state.settings,
         clock=request.app.state.clock,
@@ -58,11 +88,29 @@ def create_discovery_job(
         request_payload=body.model_dump(mode="json", exclude_none=True),
     )
     session.commit()
+    response.status_code = 202 if created else 200
     return footprint_job_response(
         session,
         job,
         settings=request.app.state.settings,
     )
+
+
+@router.delete("", response_model=ClearFootprintHistoryResponse)
+def clear_discovery_history(
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=50),
+    auth: AuthContext = Depends(require_prototype_auth),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    response = clear_terminal_history(
+        session,
+        user_id=auth.user_id,
+        now=request.app.state.clock.now(),
+        limit=limit,
+    )
+    session.commit()
+    return response
 
 
 @router.get("/{job_id}", response_model=FootprintJobResponse)
@@ -77,6 +125,7 @@ def get_discovery_job(
         job_id=str(job_id),
         user_id=auth.user_id,
         for_update=True,
+        now=request.app.state.clock.now(),
     )
     # The browser polls this route throughout discovery. Advance an expired
     # checkpoint here as a backstop for watchdog cadence so the UI never keeps
@@ -93,6 +142,50 @@ def get_discovery_job(
             settings=request.app.state.settings,
         )
         session.commit()
+    return footprint_job_response(
+        session,
+        job,
+        settings=request.app.state.settings,
+    )
+
+
+@router.get("/{job_id}/history", response_model=FootprintHistoryRunPageResponse)
+def get_discovery_job_history(
+    job_id: UUID,
+    request: Request,
+    cursor: str | None = Query(default=None, min_length=1, max_length=512),
+    limit: int = Query(default=20, ge=1, le=100),
+    auth: AuthContext = Depends(require_prototype_auth),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    return list_related_history_runs(
+        session,
+        representative_job_id=str(job_id),
+        user_id=auth.user_id,
+        now=request.app.state.clock.now(),
+        cursor=cursor,
+        limit=limit,
+        result_reads_enabled=request.app.state.settings.prototype_report_reads_enabled,
+    )
+
+
+@router.post("/{job_id}/refresh", response_model=FootprintJobResponse, status_code=202)
+def refresh_discovery_job(
+    job_id: UUID,
+    request: Request,
+    idempotency_key: str = Header(alias="Idempotency-Key"),
+    auth: AuthContext = Depends(require_prototype_auth),
+    session: Session = Depends(get_session),
+) -> dict[str, object]:
+    job, _created = refresh_footprint_job(
+        session,
+        settings=request.app.state.settings,
+        clock=request.app.state.clock,
+        user_id=auth.user_id,
+        source_job_id=str(job_id),
+        idempotency_key=idempotency_key,
+    )
+    session.commit()
     return footprint_job_response(
         session,
         job,
@@ -172,6 +265,7 @@ def get_discovery_brief(
         job_id=str(job_id),
         user_id=auth.user_id,
         reads_enabled=request.app.state.settings.prototype_report_reads_enabled,
+        now=request.app.state.clock.now(),
     )
 
 
@@ -188,6 +282,7 @@ def get_discovery_evidence(
             job_id=str(job_id),
             user_id=auth.user_id,
             reads_enabled=request.app.state.settings.prototype_report_reads_enabled,
+            now=request.app.state.clock.now(),
         )
     }
 
@@ -201,7 +296,12 @@ def stream_discovery_job_events(
     auth: AuthContext = Depends(require_prototype_auth),
 ):
     with request.app.state.session_factory() as session:
-        owner_footprint_job(session, job_id=str(job_id), user_id=auth.user_id)
+        owner_footprint_job(
+            session,
+            job_id=str(job_id),
+            user_id=auth.user_id,
+            now=request.app.state.clock.now(),
+        )
     try:
         header_sequence = int(last_event_id_header or 0)
     except ValueError:
@@ -216,6 +316,15 @@ def stream_discovery_job_events(
             if await request.is_disconnected():
                 return
             with factory() as session:
+                try:
+                    owner_footprint_job(
+                        session,
+                        job_id=str(job_id),
+                        user_id=auth.user_id,
+                        now=request.app.state.clock.now(),
+                    )
+                except ApiError:
+                    return
                 events = session.scalars(
                     select(JobEvent)
                     .where(JobEvent.job_id == str(job_id), JobEvent.sequence > sequence)
@@ -287,6 +396,7 @@ def delete_discovery_job(
         session,
         job_id=str(job_id),
         user_id=auth.user_id,
+        now=request.app.state.clock.now(),
     )
     delete_job(
         session,

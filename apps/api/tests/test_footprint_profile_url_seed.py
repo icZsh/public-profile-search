@@ -232,5 +232,6 @@ def test_equivalent_profile_urls_share_the_idempotency_payload(
         profile_url="https://instagram.com/octaviyao",
     )
 
-    assert first.status_code == second.status_code == 202
+    assert first.status_code == 202
+    assert second.status_code == 200
     assert first.json()["job_id"] == second.json()["job_id"]

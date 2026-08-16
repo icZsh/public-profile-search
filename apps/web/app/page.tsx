@@ -1,20 +1,15 @@
 import { FootprintSearchForm } from "@/components/FootprintSearchForm";
+import { FootprintHistoryDrawer } from "@/components/FootprintHistoryDrawer";
 import Link from "next/link";
 
 export default function HomePage() {
   return (
     <main className="traceApp traceHome">
       <nav className="traceTopbar" aria-label="Primary navigation">
+        <FootprintHistoryDrawer />
         <Link className="traceBrand" href="/">
           tracebrief<span className="brandMark">/</span>
         </Link>
-        <details className="traceOperatorDisclosure">
-          <summary>Operator view</summary>
-          <div>
-            <strong>Public-source discovery</strong>
-            <span>Quick checks 20 sites. Deep expands to 56 and adds a cited narrative.</span>
-          </div>
-        </details>
       </nav>
 
       <section className="traceSearchIntro">

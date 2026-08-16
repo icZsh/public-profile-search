@@ -75,7 +75,8 @@ def _new_graph(*, search_mode: str = "quick") -> _Graph:
             SearchJob(
                 id=job_id,
                 user_id="professional-finalization-test-user",
-                retry_of_job_id=None,
+                refresh_of_job_id=None,
+                history_reuse_policy=None,
                 normalized_identifier_hmac="a" * 64,
                 canonical_input_url_ciphertext=None,
                 input_provider_id="maigret_discovery_v1",

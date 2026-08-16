@@ -26,6 +26,7 @@ from apps.api.app.services.maigret_runs import process_maigret_scan_run
 from workers.maintenance.deadline_watchdog import finalize_expired_jobs
 from workers.maintenance.outbox_dispatcher import dispatch_once, maintenance_once
 from workers.maintenance.reconciler import reclaim_expired_leases
+from workers.maintenance.retention import remove_expired_search_jobs
 from workers.orchestrator.celery_app import celery_app
 
 
@@ -57,7 +58,8 @@ def add_maigret_run(factory, *, now: datetime, deadline_at: datetime) -> tuple[s
             SearchJob(
                 id=job_id,
                 user_id="test-user",
-                retry_of_job_id=None,
+                refresh_of_job_id=None,
+                history_reuse_policy=None,
                 normalized_identifier_hmac="c" * 64,
                 canonical_input_url_ciphertext=None,
                 input_provider_id="maigret_discovery_v1",
@@ -170,10 +172,14 @@ class RecordingPublisher:
         self.provider_runs: list[tuple[str, str]] = []
         self.maigret_runs: list[tuple[str, str]] = []
 
-    def send_provider_run(self, provider_run_id: str, task_id: str) -> None:
+    def send_provider_run(
+        self, provider_run_id: str, task_id: str, *, priority: int = 0
+    ) -> None:
         self.provider_runs.append((provider_run_id, task_id))
 
-    def send_maigret_scan_run(self, provider_run_id: str, task_id: str) -> None:
+    def send_maigret_scan_run(
+        self, provider_run_id: str, task_id: str, *, priority: int = 0
+    ) -> None:
         self.maigret_runs.append((provider_run_id, task_id))
 
 
@@ -202,6 +208,83 @@ def test_dispatcher_routes_maigret_outbox_to_dedicated_task():
         assert message is not None
         assert message.attempts == 1
         assert message.dispatched_at is not None
+
+
+def test_dispatcher_sends_high_priority_history_revalidation_first():
+    factory = session_factory()
+    now = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
+    low_id = new_id()
+    high_id = new_id()
+    with factory() as session, session.begin():
+        session.add_all(
+            [
+                OutboxMessage(
+                    id=low_id,
+                    topic="maigret_scan_run",
+                    dedupe_key="maigret-scan:low:generation:1",
+                    payload={"provider_run_id": "low", "scan_run_id": "low"},
+                    priority=0,
+                    created_at=now,
+                    dispatched_at=None,
+                    attempts=0,
+                ),
+                OutboxMessage(
+                    id=high_id,
+                    topic="maigret_scan_run",
+                    dedupe_key="maigret-scan:high:generation:1",
+                    payload={"provider_run_id": "high", "scan_run_id": "high"},
+                    priority=9,
+                    created_at=now,
+                    dispatched_at=None,
+                    attempts=0,
+                ),
+            ]
+        )
+
+    class PriorityRecordingPublisher:
+        def __init__(self) -> None:
+            self.maigret_runs: list[tuple[str, str, int]] = []
+
+        def send_maigret_scan_run(
+            self,
+            provider_run_id: str,
+            task_id: str,
+            *,
+            priority: int = 0,
+        ) -> None:
+            self.maigret_runs.append((provider_run_id, task_id, priority))
+
+    publisher = PriorityRecordingPublisher()
+    assert dispatch_once(factory, publisher) is True
+    assert publisher.maigret_runs == [("high", "maigret-scan:high:generation:1", 9)]
+    with factory() as session:
+        high = session.get(OutboxMessage, high_id)
+        low = session.get(OutboxMessage, low_id)
+        assert high is not None and high.dispatched_at is not None
+        assert low is not None and low.dispatched_at is None
+
+
+def test_retention_fences_and_deletes_an_expired_active_job():
+    factory = session_factory()
+    now = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
+    _snapshot_id, job_id, provider_run_id = add_maigret_run(
+        factory,
+        now=now,
+        deadline_at=now + timedelta(minutes=5),
+    )
+    with factory() as session, session.begin():
+        job = session.get(SearchJob, job_id)
+        assert job is not None and job.status == "discovering"
+        job.expires_at = now - timedelta(seconds=1)
+
+    assert remove_expired_search_jobs(factory, now=now, batch_size=1) == 1
+    with factory() as session:
+        assert session.get(SearchJob, job_id) is None
+        assert session.get(ProviderRun, provider_run_id) is None
+        tombstone = session.get(JobDeletionTombstone, job_id)
+        assert tombstone is not None
+        assert tombstone.write_fence == 2
+        assert tombstone.deleted_at.replace(tzinfo=UTC) == now
 
 
 def test_celery_registers_maigret_task_and_queue_route():
