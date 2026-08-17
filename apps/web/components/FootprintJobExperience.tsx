@@ -599,8 +599,9 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
               onClick={stopSearch}
               disabled={stopping || selectingCandidateId !== null}
               aria-busy={stopping}
+              aria-label={stopping ? "Stopping search" : "Stop search"}
             >
-              {stopping ? "Stopping…" : "Stop search"}
+              {stopping ? "Stopping…" : "Stop"}
             </button>
           ) : null}
         </div>
@@ -768,16 +769,6 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
                         key={step.phase}
                         aria-current={state === "running" ? "step" : undefined}
                       >
-                        <div>
-                          <strong>{visibleProgressLabel(index, deepMode)}</strong>
-                          <small>
-                            {index === 0
-                              ? `${completed} of ${selected || "—"} sites checked · ${candidates.items.length} candidates kept`
-                              : state === "running"
-                                ? `Stage elapsed ${deepStageElapsed}`
-                            : "Written only from retrieved public sources"}
-                          </small>
-                        </div>
                         <span
                           className={`traceStepStatusRing traceStepStatusRing-${state}`}
                           aria-hidden="true"
@@ -819,7 +810,26 @@ export function FootprintJobExperience({ jobId }: { jobId: string }) {
                             </svg>
                           ) : null}
                         </span>
-                        <span className="traceSrOnly">{stepStatusLabel}</span>
+                        <div className="traceProgressStepCopy">
+                          <strong>{visibleProgressLabel(index, deepMode)}</strong>
+                          <small>
+                            {index === 0
+                              ? `${completed} of ${selected || "—"} sites checked · ${candidates.items.length} candidates kept`
+                              : state === "running"
+                                ? `Stage elapsed ${deepStageElapsed}`
+                                : "Written only from retrieved public sources"}
+                          </small>
+                          {state === "running" && index === 0 && selected > 0 ? (
+                            <span className="traceProgressStepTrack" aria-hidden="true">
+                              <i style={{ width: `${progress}%` }} />
+                            </span>
+                          ) : null}
+                        </div>
+                        <span
+                          className={`traceStepStatusPill traceStepStatusPill-${state}`}
+                        >
+                          {stepStatusLabel}
+                        </span>
                       </li>
                     );
                   })}

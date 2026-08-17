@@ -48,7 +48,7 @@ def _create_job(
     return str(response.json()["job_id"])
 
 
-def test_history_groups_exact_seed_across_modes_with_stable_pagination(
+def test_history_groups_handle_across_modes_with_stable_pagination(
     client,
     app,
     clock,
@@ -125,7 +125,7 @@ def test_history_groups_exact_seed_across_modes_with_stable_pagination(
         assert session.get(SearchJob, bob) is not None
 
 
-def test_history_groups_profile_urls_with_platform_handles_but_not_bare_handles(
+def test_history_groups_same_handle_across_seed_types_and_platforms(
     client,
     clock,
     auth_headers,
@@ -153,28 +153,45 @@ def test_history_groups_profile_urls_with_platform_handles_but_not_bare_handles(
         platform="instagram",
     )
     clock.value += timedelta(minutes=1)
+    other_platform_job_id = _create_job(
+        client,
+        auth_headers,
+        identifier="Octaviyao",
+        key="history-other-platform-handle",
+        platform="github",
+    )
+    clock.value += timedelta(minutes=1)
     bare_job_id = _create_job(
         client,
         auth_headers,
-        identifier="octaviyao",
+        identifier="OCTAVIYAO",
         key="history-bare-handle",
     )
 
-    response = client.get("/v1/footprint-jobs?q=OCTAVI", headers=auth_headers)
+    response = client.get("/v1/footprint-jobs?q=@OCTAVI", headers=auth_headers)
     assert response.status_code == 200
     groups = response.json()["items"]
-    assert len(groups) == 2
-    platform_group = next(group for group in groups if group["seed"]["platform"])
-    bare_group = next(group for group in groups if group["seed"]["platform"] is None)
-    assert platform_group["representative_job_id"] == platform_job_id
-    assert platform_group["run_count"] == 2
-    assert platform_group["seed"] == {
-        "kind": "platform_identifier",
-        "platform": "instagram",
-        "identifier": "octaviyao",
+    assert len(groups) == 1
+    group = groups[0]
+    assert group["representative_job_id"] == bare_job_id
+    assert group["run_count"] == 4
+    assert group["seed"] == {
+        "kind": "bare_handle",
+        "platform": None,
+        "identifier": "OCTAVIYAO",
     }
-    assert bare_group["representative_job_id"] == bare_job_id
-    assert bare_group["run_count"] == 1
+
+    related = client.get(
+        f"/v1/footprint-jobs/{platform_job_id}/history",
+        headers=auth_headers,
+    )
+    assert related.status_code == 200
+    assert [item["job_id"] for item in related.json()["items"]] == [
+        bare_job_id,
+        other_platform_job_id,
+        platform_job_id,
+        str(profile_url.json()["job_id"]),
+    ]
 
 
 def test_history_is_owner_scoped_and_excludes_expired_jobs(

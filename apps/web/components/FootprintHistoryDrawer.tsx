@@ -4,7 +4,12 @@ import type {
   FootprintHistoryGroup,
   FootprintHistoryRun,
 } from "@public-profile-search/generated-api-client";
-import { ClockCounterClockwiseIcon } from "@phosphor-icons/react";
+import {
+  ArrowClockwiseIcon,
+  ClockCounterClockwiseIcon,
+  EyeIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -69,10 +74,7 @@ function readableStatus(status: string): string {
 }
 
 function seedLabel(group: FootprintHistoryGroup): string {
-  const { seed } = group;
-  return seed.platform
-    ? `${seed.platform} · @${seed.identifier}`
-    : `@${seed.identifier}`;
+  return `@${group.seed.identifier}`;
 }
 
 function modelLabel(run: FootprintHistoryRun): string {
@@ -639,15 +641,29 @@ export function FootprintHistoryDrawer() {
                                         <Link
                                           href={`/footprint/${run.job_id}`}
                                           onClick={closeDrawer}
+                                          aria-label="View"
+                                          data-tooltip="View"
                                         >
-                                          View
+                                          <EyeIcon aria-hidden="true" size={17} weight="regular" />
                                         </Link>
                                         <button
                                           type="button"
                                           onClick={() => void refreshRun(run)}
                                           disabled={refreshingId !== null}
+                                          aria-label="Refresh"
+                                          aria-busy={refreshingId === run.job_id}
+                                          data-tooltip="Refresh"
                                         >
-                                          {refreshingId === run.job_id ? "Starting…" : "Refresh"}
+                                          <ArrowClockwiseIcon
+                                            className={
+                                              refreshingId === run.job_id
+                                                ? "traceHistoryActionSpinning"
+                                                : undefined
+                                            }
+                                            aria-hidden="true"
+                                            size={17}
+                                            weight="regular"
+                                          />
                                         </button>
                                         {terminalStatuses.has(run.status) ? (
                                           <button
@@ -655,8 +671,15 @@ export function FootprintHistoryDrawer() {
                                             type="button"
                                             onClick={() => void deleteRun(run)}
                                             disabled={deletingId !== null}
+                                            aria-label="Delete"
+                                            aria-busy={deletingId === run.job_id}
+                                            data-tooltip="Delete"
                                           >
-                                            {deletingId === run.job_id ? "Deleting…" : "Delete"}
+                                            <TrashIcon
+                                              aria-hidden="true"
+                                              size={17}
+                                              weight="regular"
+                                            />
                                           </button>
                                         ) : null}
                                       </div>

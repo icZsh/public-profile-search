@@ -368,10 +368,10 @@ paths:
       tags: [Footprint discovery]
       operationId: listFootprintHistory
       description: >-
-        Returns the owner's unexpired footprint-search history grouped by exact
-        normalized seed. Groups are ordered by their latest run. Profile URLs
-        and platform-qualified handles share a group when they normalize to the
-        same platform and handle; bare handles remain separate.
+        Returns the owner's unexpired footprint-search history grouped by
+        case-insensitive normalized handle, regardless of whether a search used
+        a bare handle, platform-qualified handle, or supported profile URL.
+        Groups are ordered by their latest run.
       security:
         - prototypeAuth: []
       parameters:
@@ -398,7 +398,7 @@ paths:
             default: 20
       responses:
         "200":
-          description: Newest-first page of exact-seed history groups.
+          description: Newest-first page of handle history groups.
           content:
             application/json:
               schema:
@@ -511,8 +511,8 @@ paths:
       tags: [Footprint discovery]
       operationId: listFootprintJobHistory
       description: >-
-        Returns unexpired runs in the referenced job's exact normalized-seed
-        group, ordered newest first.
+        Returns unexpired runs in the referenced job's case-insensitive
+        normalized-handle group, ordered newest first.
       security:
         - prototypeAuth: []
       parameters:
@@ -532,7 +532,7 @@ paths:
             default: 20
       responses:
         "200":
-          description: Newest-first page of runs for the exact normalized seed.
+          description: Newest-first page of runs for the normalized handle.
           content:
             application/json:
               schema:

@@ -80,9 +80,9 @@ unavailable; Deep can still use the GitHub public-profile path without it.
 Footprint searches are also the server-backed search history; the browser does not
 keep a separate local copy. History is scoped to the authenticated prototype user,
 served with private/no-store caching, and retained for 30 days. The homepage history
-drawer groups equivalent platform-qualified handles and supported profile URLs by
-their exact normalized platform and handle. A bare handle stays in its own group, so
-textually identical handles on unrelated platforms are never merged.
+drawer groups searches by their case-insensitive normalized handle. Bare handles,
+platform-qualified handles, and supported profile URLs with the same handle therefore
+appear together, while the original platform remains attached to each saved search.
 
 The homepage requests `prefer_existing` behavior. Repeating a seed opens the latest
 unexpired active or usable run immediately when its mode, selected Deep model, and

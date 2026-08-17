@@ -50,9 +50,9 @@ guessed age, vulnerability label, or other sensitive inference.
 
 - Footprint jobs store the submitted handle/platform seed and normalized seed metadata.
   Supported canonical input URLs are encrypted, and equivalent seeds are indexed with
-  a versioned keyed HMAC. The exact normalized platform/handle groups a supported
-  profile URL with its platform-qualified handle; a bare handle remains a separate
-  group.
+  a versioned keyed HMAC. Exact normalized seeds remain the boundary for reopening and
+  reuse, while the owner-only history view groups case-insensitive matching handles
+  across bare handles, platform-qualified handles, and supported profile URLs.
 - Search history is not a second copy of results. It is a minimized owner-scoped view
   over the existing job, candidate-count, status, and report-availability records.
 - Approved public account fields, source observations, account-association decisions,

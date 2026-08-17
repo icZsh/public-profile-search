@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import unicodedata
 from datetime import datetime
 from uuid import UUID
 
@@ -151,6 +152,28 @@ def _seed_summary(job: SearchJob) -> dict[str, object]:
     }
 
 
+def _history_handle_key():
+    """Return the platform-free canonical handle embedded in normalized_seed."""
+    platform_length = func.length(func.coalesce(SearchJob.seed_platform, "*"))
+    canonical_handle = func.substr(
+        SearchJob.normalized_seed,
+        platform_length + len(":handle:") + 1,
+    )
+    return func.coalesce(canonical_handle, func.lower(SearchJob.seed_identifier))
+
+
+def _history_handle_value(job: SearchJob) -> str:
+    prefix = f"{job.seed_platform or '*'}:handle:"
+    if job.normalized_seed and job.normalized_seed.startswith(prefix):
+        return job.normalized_seed.removeprefix(prefix)
+    return (
+        unicodedata.normalize("NFKC", job.seed_identifier or "")
+        .strip()
+        .removeprefix("@")
+        .casefold()
+    )
+
+
 def list_history_groups(
     session: Session,
     *,
@@ -161,17 +184,18 @@ def list_history_groups(
     limit: int,
     result_reads_enabled: bool,
 ) -> dict[str, object]:
+    handle_key = _history_handle_key()
     ranked = (
         select(
             SearchJob.id.label("job_id"),
-            SearchJob.normalized_identifier_hmac.label("seed_hmac"),
+            handle_key.label("handle_key"),
             SearchJob.accepted_at.label("accepted_at"),
             func.count(SearchJob.id)
-            .over(partition_by=SearchJob.normalized_identifier_hmac)
+            .over(partition_by=handle_key)
             .label("run_count"),
             func.row_number()
             .over(
-                partition_by=SearchJob.normalized_identifier_hmac,
+                partition_by=handle_key,
                 order_by=(SearchJob.accepted_at.desc(), SearchJob.id.desc()),
             )
             .label("row_number"),
@@ -188,11 +212,14 @@ def list_history_groups(
         .join(SearchJob, SearchJob.id == ranked.c.job_id)
         .where(ranked.c.row_number == 1)
     )
-    normalized_q = (q or "").strip().casefold()
+    normalized_q = (
+        unicodedata.normalize("NFKC", q or "")
+        .strip()
+        .removeprefix("@")
+        .casefold()
+    )
     if normalized_q:
-        statement = statement.where(
-            func.lower(SearchJob.seed_identifier).contains(normalized_q, autoescape=True)
-        )
+        statement = statement.where(ranked.c.handle_key.contains(normalized_q, autoescape=True))
     if cursor:
         statement = statement.where(
             _after_cursor(ranked.c.accepted_at, ranked.c.job_id, _decode_cursor(cursor))
@@ -253,8 +280,7 @@ def list_related_history_runs(
         raise ApiError(404, "job_not_found", "The discovery job was not found.")
     statement = select(SearchJob).where(
         *_visible_history_filters(user_id=user_id, now=now),
-        SearchJob.normalized_identifier_hmac
-        == representative.normalized_identifier_hmac,
+        _history_handle_key() == _history_handle_value(representative),
     )
     if cursor:
         statement = statement.where(

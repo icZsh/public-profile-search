@@ -67,8 +67,15 @@ test("history drawer supports grouped navigation, accessible dismissal, and safe
   assert.match(history, /aria-expanded=\{expanded\}/);
   assert.match(history, /Load more searches/);
   assert.match(history, /Show older runs/);
-  assert.match(history, /View\s*<\/Link>/);
-  assert.match(history, /"Refresh"/);
+  assert.match(history, /EyeIcon/);
+  assert.match(history, /ArrowClockwiseIcon/);
+  assert.match(history, /TrashIcon/);
+  assert.match(history, /aria-label="View"/);
+  assert.match(history, /aria-label="Refresh"/);
+  assert.match(history, /aria-label="Delete"/);
+  assert.match(history, /data-tooltip="View"/);
+  assert.match(history, /data-tooltip="Refresh"/);
+  assert.match(history, /data-tooltip="Delete"/);
   assert.match(history, /terminalStatuses\.has\(run\.status\)/);
   assert.match(history, /Permanently delete this completed search/);
   assert.match(history, /Running searches will remain/);

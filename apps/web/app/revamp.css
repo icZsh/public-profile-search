@@ -1,5 +1,6 @@
 .traceApp {
   min-height: 100vh;
+  overflow-x: clip;
   background: #e8e5da;
   color: #17201c;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
@@ -36,6 +37,9 @@
   padding: 0 24px;
   border-bottom: 1px solid #d8d8cf;
   background: rgb(255 253 248 / 72%);
+  box-shadow: 0 1px 0 rgb(23 32 28 / 2%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
+  backdrop-filter: blur(14px) saturate(115%);
 }
 
 .traceBrand {
@@ -80,15 +84,17 @@
 .traceTopbarPrimary,
 .traceTopbar .stopSearchButton {
   display: inline-flex;
-  min-height: 30px;
+  min-height: 36px;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d8d8cf;
-  padding: 0 12px;
-  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: #efeee8;
   color: #3d4a41;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 600;
   line-height: 1;
   text-decoration: none;
   text-transform: none;
@@ -96,7 +102,7 @@
 }
 
 .traceSecondaryButton:hover {
-  border-color: #17201c;
+  background: #e5e3da;
   color: #17201c;
 }
 
@@ -119,10 +125,40 @@
 }
 
 .traceTopbarPrimary {
-  border-color: #17201c;
   background: #d7ff53;
   color: #17201c;
   font-weight: 700;
+}
+
+.traceApp .traceTopbarPrimary {
+  border: 0;
+  border-radius: 999px;
+}
+
+.traceTopbarPrimary:hover:not(:disabled) {
+  background: #c9f13e;
+}
+
+.traceTopbar .stopSearchButton {
+  background: #f6e6e1;
+  color: #a64231;
+  font-weight: 700;
+}
+
+.traceTopbar .stopSearchButton:hover:not(:disabled) {
+  background: #f0d9d2;
+}
+
+.traceJob .traceSecondaryButton:focus-visible,
+.traceJob .traceTopbarPrimary:focus-visible,
+.traceJob .stopSearchButton:focus-visible,
+.traceJob .traceReviewButton:focus-visible,
+.traceJob .traceSourceRow:focus-visible,
+.traceJob .traceSourceCitation:focus-visible,
+.traceJob .candidateAnchorButton:focus-visible,
+.traceJob .tracePrimaryButton:focus-visible {
+  outline: 3px solid #8eaf24;
+  outline-offset: 3px;
 }
 
 .traceKicker,
@@ -492,11 +528,11 @@
 
 .traceProgressList.deepProgressSteps {
   display: grid;
-  margin: 24px 0 0;
+  gap: 6px;
+  margin: 20px 0 0;
   border: 0;
   padding: 0;
   grid-template-columns: 1fr;
-  gap: 0;
   background: transparent;
 }
 
@@ -504,18 +540,20 @@
   position: relative;
   display: grid;
   min-height: 72px;
-  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
   border-left: 3px solid transparent;
-  padding: 14px 14px 14px 12px;
+  border-radius: 12px;
+  padding: 14px 16px 14px 13px;
   background: transparent;
   list-style: none;
 }
 
 .traceProgressStep.deepProgressStep-running {
   border-left-color: #d7ff53;
-  background: rgb(215 255 83 / 10%);
+  background: rgb(215 255 83 / 16%);
+  box-shadow: inset 1px 0 0 #d7ff53;
 }
 
 .traceProgressStep.deepProgressStep-pending {
@@ -602,28 +640,74 @@
   stroke: #a64231;
 }
 
-.traceProgressStep > div {
+.traceProgressStepCopy {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
-.traceProgressStep > div strong {
+.traceProgressStepCopy strong {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 21px;
   font-weight: 500;
 }
 
-.traceProgressStep > div small {
+.traceProgressStepCopy small {
   color: #647168;
   font-size: 11px;
+}
+
+.traceProgressStepTrack {
+  display: block;
+  width: min(320px, 100%);
+  height: 4px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e0ded4;
+}
+
+.traceProgressStepTrack > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8eaf24;
+  transition: width 240ms ease;
+}
+
+.traceStepStatusPill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 11px;
+  background: #efeee8;
+  color: #647168;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.traceStepStatusPill-running {
+  background: rgb(215 255 83 / 40%);
+  color: #3d4a41;
+  font-weight: 800;
+}
+
+.traceStepStatusPill-stopped {
+  background: #f6e6e1;
+  color: #a64231;
 }
 
 .traceLiveSidebar {
   position: sticky;
   top: 20px;
   border: 1px solid #d8d8cf;
+  border-radius: 12px;
   padding: 22px;
   background: #fffdf8;
+  box-shadow: 0 1px 3px rgb(23 32 28 / 6%);
 }
 
 .traceSidebarHeading {
@@ -651,7 +735,7 @@
 
 .traceLiveSources {
   margin-top: 10px;
-  border: 1px solid #e0ded4;
+  border: 0;
 }
 
 .traceLiveSources > div {
@@ -660,9 +744,14 @@
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  border-bottom: 1px solid #e0ded4;
-  padding: 0 10px;
+  border-bottom: 0;
+  border-radius: 999px;
+  padding: 0 12px;
   font-size: 11px;
+}
+
+.traceLiveSources > div:last-of-type {
+  background: rgb(215 255 83 / 28%);
 }
 
 .traceLiveSources > div:last-child {
@@ -697,15 +786,17 @@
 }
 
 .traceCoverageTrack {
-  height: 3px;
+  height: 4px;
   margin-top: 12px;
   overflow: hidden;
+  border-radius: 999px;
   background: #e0ded4;
 }
 
 .traceCoverageTrack > span {
   display: block;
   height: 100%;
+  border-radius: inherit;
   background: #8eaf24;
   transition: width 240ms ease;
 }
@@ -798,15 +889,23 @@
 }
 
 .traceFoundLink {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 11px;
+  background: #efeee8;
   color: #647168;
   font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-decoration: none;
   text-transform: uppercase;
 }
 
 .traceFoundLink:hover {
-  color: #8eaf24;
+  background: #e5e3da;
+  color: #17201c;
 }
 
 .traceFoundLinkUnavailable {
@@ -839,8 +938,9 @@
 }
 
 .traceCheckpointStatus strong {
-  border: 1px solid #17201c;
-  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
   background: #d7ff53;
 }
 
@@ -881,10 +981,9 @@
 .traceCheckpointGrid {
   display: grid;
   margin-top: 32px;
-  border: 1px solid #17201c;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  background: #17201c;
+  gap: 16px;
+  background: transparent;
 }
 
 .traceCheckpointChoice {
@@ -892,8 +991,11 @@
   min-width: 0;
   min-height: 260px;
   flex-direction: column;
+  border: 1px solid #d8d8cf;
+  border-radius: 12px;
   padding: 24px;
   background: #fffdf8;
+  box-shadow: 0 1px 3px rgb(23 32 28 / 6%);
 }
 
 .traceCheckpointChoice:nth-child(even) {
@@ -961,7 +1063,8 @@
   width: 100%;
   min-height: 42px;
   margin-top: auto;
-  border: 1px solid #17201c;
+  border: 0;
+  border-radius: 999px;
   padding: 0 16px;
   background: #d7ff53;
   color: #17201c;
@@ -973,6 +1076,7 @@
 }
 
 .traceCheckpointChoice:nth-child(even) .candidateAnchorButton {
+  border: 1px solid #17201c;
   background: transparent;
 }
 
@@ -992,6 +1096,7 @@
   gap: 24px;
   margin-top: 18px;
   border: 1px dashed #c4c1b5;
+  border-radius: 12px;
   padding: 16px 18px;
   color: #3d4a41;
   font-size: 12px;
@@ -1009,6 +1114,7 @@
   width: min(1108px, calc(100% - 48px));
   margin: 18px auto 0;
   border: 1px solid #a64231;
+  border-radius: 12px;
   padding: 12px 16px;
   background: #fbf3ef;
   color: #a64231;
@@ -1026,12 +1132,14 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  width: min(1108px, calc(100% - 48px));
+  gap: 16px 20px;
+  width: min(1108px, calc(100% - 72px));
   margin: 18px auto 0;
-  border: 1px solid #17201c;
-  padding: 14px 16px;
-  background: #fffdf8;
+  border: 1px solid #d8d8cf;
+  border-radius: 12px;
+  padding: 13px 16px;
+  background: rgb(255 253 248 / 74%);
+  box-shadow: 0 1px 3px rgb(23 32 28 / 5%);
 }
 
 .traceSavedSearchMeta > div {
@@ -1048,9 +1156,8 @@
 }
 
 .traceSavedSearchMeta > div > strong {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 18px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .traceSavedSearchMeta > div > small {
@@ -1061,6 +1168,8 @@
 .traceSavedSearchMeta > .tracePrimaryButton {
   min-height: 38px;
   flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
   padding: 0 14px;
   font-size: 10px;
 }
@@ -1106,6 +1215,8 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
+  border: 0;
+  border-radius: 999px;
   padding: 0 18px;
   color: #17201c;
   font-size: 11px;
@@ -1119,26 +1230,28 @@
 }
 
 .traceBriefLayout {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 40px 36px 72px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 396px);
+  gap: 36px;
   align-items: flex-start;
 }
 
 .traceBriefDocumentWrap {
-  display: flex;
   min-width: 0;
-  flex: 1 1 660px;
-  justify-content: center;
-  padding: clamp(20px, 3vw, 40px) clamp(16px, 3vw, 36px) 72px;
+  padding: 0;
 }
 
 .traceBriefPaper {
   width: 100%;
   max-width: 820px;
   border: 1px solid #d8d8cf;
-  padding: clamp(28px, 4vw, 56px) clamp(24px, 4.5vw, 60px) 60px;
+  border-radius: 12px;
+  padding: 48px 56px 52px;
   background: #fffdf8;
-  box-shadow: 0 14px 34px rgb(23 32 28 / 8%);
+  box-shadow: 0 1px 3px rgb(23 32 28 / 6%), 0 14px 34px rgb(23 32 28 / 8%);
 }
 
 .traceBriefHeader {
@@ -1146,14 +1259,14 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 20px 30px;
+  gap: 16px 24px;
   border-bottom: 3px double #17201c;
   padding-bottom: 18px;
 }
 
 .traceBriefTitleBlock {
   min-width: 0;
-  flex: 1 1 300px;
+  flex: 1 1 260px;
 }
 
 .traceBriefEyebrow,
@@ -1174,7 +1287,7 @@
 }
 
 .traceBriefHeader h1 {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   overflow-wrap: anywhere;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 52px;
@@ -1184,7 +1297,7 @@
 }
 
 .traceBriefSeed {
-  margin-top: 10px;
+  margin-top: 9px;
   color: #647168;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 17px;
@@ -1199,6 +1312,38 @@
   font-size: 11px;
   text-align: right;
   white-space: nowrap;
+}
+
+.traceQuickMetadata {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 8px;
+  justify-items: end;
+  color: #647168;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.traceBriefStatusPill {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  padding: 0 13px;
+  background: #efeee8;
+  color: #3d4a41;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.traceBriefStatusPill > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #909890;
 }
 
 .traceBriefMetadata dt {
@@ -1217,22 +1362,26 @@
 
 .traceBriefLead {
   display: grid;
-  margin-top: 34px;
-  grid-template-columns: minmax(0, 1fr) 196px;
-  gap: 36px;
+  margin-top: 28px;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 34px;
 }
 
 .traceBriefLeadSummary > p {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 23px;
+  font-size: 21px;
   line-height: 1.55;
   text-wrap: pretty;
 }
 
+.traceBriefDeep .traceBriefLeadSummary > p {
+  font-size: 23px;
+}
+
 .traceBriefConfidence {
-  border-left: 1px solid #d8d8cf;
-  padding-left: 22px;
+  border-left: 1px solid #e6e3d9;
+  padding-left: 20px;
 }
 
 .traceBriefConfidence > div {
@@ -1246,9 +1395,8 @@
 .traceBriefConfidence > strong {
   display: block;
   margin-top: 9px;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 27px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.1;
 }
 
@@ -1259,9 +1407,27 @@
   line-height: 1.6;
 }
 
+.traceConfidenceMeter {
+  display: grid;
+  margin-top: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.traceConfidenceMeter > i {
+  height: 6px;
+  border-radius: 999px;
+  background: #e0ded4;
+}
+
+.traceConfidenceMeter > i:nth-child(-n + 2),
+.traceConfidenceMeter > .traceConfidenceMeterFilled {
+  background: #8eaf24;
+}
+
 .traceBriefCompeting,
 .traceBriefSection {
-  margin-top: 38px;
+  margin-top: 32px;
 }
 
 .traceBriefCompeting > h2,
@@ -1273,16 +1439,20 @@
 .traceBriefCompetingGrid {
   display: grid;
   margin-top: 12px;
-  border: 1px solid #17201c;
+  border: 0;
+  border-radius: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  background: #17201c;
+  gap: 12px;
+  background: transparent;
 }
 
 .traceBriefSubjectCard {
   min-width: 0;
+  border: 1px solid #d8d8cf;
+  border-radius: 12px;
   padding: 20px 22px;
   background: #fffdf8;
+  box-shadow: 0 1px 3px rgb(23 32 28 / 6%);
 }
 
 .traceBriefSubjectCardCompeting {
@@ -1310,7 +1480,8 @@
 }
 
 .traceBriefSubjectCardHeading strong {
-  border: 1px solid #17201c;
+  border: 0;
+  border-radius: 999px;
   padding: 4px 8px;
   background: #d7ff53;
   color: #17201c;
@@ -1428,9 +1599,10 @@
   align-items: baseline;
   gap: 8px;
   margin-top: 12px;
-  border-left: 2px solid #8eaf24;
-  padding: 8px 10px;
-  background: rgb(215 255 83 / 10%);
+  border-left: 3px solid #8eaf24;
+  border-radius: 0 10px 10px 0;
+  padding: 9px 11px;
+  background: rgb(215 255 83 / 12%);
   color: #647168;
   font-size: 10px;
   line-height: 1.45;
@@ -1492,13 +1664,18 @@
 
 .traceReviewButton {
   min-height: 30px;
-  border: 1px solid #17201c;
-  padding: 0 10px;
-  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 13px;
+  background: #efeee8;
   color: #17201c;
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
+}
+
+.traceApp .traceReviewButton {
+  border-radius: 999px;
 }
 
 .traceReviewButton:hover,
@@ -1507,7 +1684,7 @@
 }
 
 .traceReviewButtonExclude {
-  border-color: #d8d8cf;
+  background: transparent;
   color: #647168;
 }
 
@@ -1525,6 +1702,7 @@
 .traceBriefSetAside {
   margin-top: 16px;
   border: 1px dashed #c4c1b5;
+  border-radius: 12px;
   padding: 14px 16px;
   color: #647168;
   font-size: 11px;
@@ -1555,6 +1733,7 @@
 .traceBriefPolicy {
   margin-top: 20px;
   border-left: 2px solid #d8d8cf;
+  border-radius: 0 12px 12px 0;
   padding: 12px 14px;
   color: #647168;
   font-size: 11px;
@@ -1581,8 +1760,9 @@
 }
 
 .traceBriefPolicy {
-  border-left-color: #a64231;
-  background: #fbf3ef;
+  border-left: 0;
+  border-radius: 12px;
+  background: #f6e6e1;
 }
 
 .traceBriefPolicy > strong {
@@ -1590,11 +1770,11 @@
 }
 
 .traceQuickRoot .traceBriefDocumentWrap {
-  flex-basis: 700px;
+  min-width: 0;
 }
 
 .traceQuickRoot .traceBriefPaper {
-  max-width: 710px;
+  max-width: 820px;
 }
 
 .traceQuickRoot .traceBriefHeader h1 {
@@ -1626,13 +1806,17 @@
   justify-content: space-between;
   gap: 24px;
   margin-top: 26px;
-  border: 1px solid #17201c;
-  padding: 14px 16px;
-  background: rgb(215 255 83 / 10%);
+  border: 0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: rgb(215 255 83 / 20%);
+  flex-wrap: wrap;
 }
 
 .traceQuickCta > div {
   display: grid;
+  min-width: 220px;
+  flex: 1 1 240px;
   gap: 3px;
 }
 
@@ -1648,7 +1832,7 @@
 
 .traceQuickModelChoice {
   display: grid;
-  flex: 0 0 178px;
+  flex: 1 1 160px;
   gap: 5px;
 }
 
@@ -1663,12 +1847,17 @@
 .traceQuickModelSelect {
   width: 100%;
   min-height: 40px;
-  border: 1px solid #17201c;
+  border: 1px solid #d8d8cf;
+  border-radius: 999px;
   padding: 0 30px 0 10px;
   background: #fffdf8;
   color: #17201c;
   cursor: pointer;
   font: 700 11px/1.3 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.traceApp .traceQuickModelSelect {
+  border-radius: 999px;
 }
 
 .traceQuickModelSelect:focus-visible {
@@ -1684,7 +1873,8 @@
 .traceQuickCta button {
   min-height: 40px;
   flex: 0 0 auto;
-  border: 1px solid #17201c;
+  border: 0;
+  border-radius: 999px;
   padding: 0 16px;
   background: #d7ff53;
   color: #17201c;
@@ -1705,22 +1895,24 @@
 
 .traceSourceSidebar {
   position: sticky;
-  top: 20px;
-  min-width: 300px;
-  max-width: 396px;
-  flex: 0 0 396px;
-  padding: clamp(20px, 3vw, 40px) clamp(16px, 3vw, 36px) 72px 0;
+  top: 76px;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
 }
 
 .traceSourcePanel {
   border: 1px solid #d8d8cf;
+  border-radius: 12px;
   padding: 22px;
   background: #fffdf8;
+  box-shadow: 0 1px 3px rgb(23 32 28 / 6%);
 }
 
 .traceSourceFocus {
   margin-top: 12px;
-  border: 1px solid #17201c;
+  border: 1px solid #d8d8cf;
+  border-radius: 12px;
   padding: 14px;
   background: #f6f5ee;
 }
@@ -1738,7 +1930,8 @@
 
 .traceSourceFocusHeading span {
   flex: 0 0 auto;
-  border: 1px solid #17201c;
+  border: 0;
+  border-radius: 999px;
   padding: 4px 7px;
   background: #d7ff53;
   font-size: 9px;
@@ -1810,13 +2003,13 @@
 
 .traceSourceList {
   margin: 10px 0 0;
-  border: 1px solid #e0ded4;
+  border: 0;
   padding: 0;
   list-style: none;
 }
 
 .traceSourceList li {
-  border-bottom: 1px solid #e0ded4;
+  border-bottom: 0;
 }
 
 .traceSourceList li:last-child {
@@ -1826,21 +2019,26 @@
 .traceSourceRow {
   display: grid;
   width: 100%;
-  min-height: 36px;
+  min-height: 38px;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   border: 0;
-  padding: 0 10px;
+  border-radius: 999px;
+  padding: 0 12px;
   background: transparent;
   color: #17201c;
   cursor: pointer;
   text-align: left;
 }
 
+.traceApp .traceSourceRow {
+  border-radius: 999px;
+}
+
 .traceSourceRow:hover,
 .traceSourceRowActive {
-  background: #d7ff53;
+  background: rgb(215 255 83 / 42%);
 }
 
 .traceSourceNumber {
@@ -1896,6 +2094,7 @@
 
 .traceBriefPolicyCompact {
   margin-top: 20px;
+  border-radius: 12px;
 }
 
 .traceSourceCitations {
@@ -1909,6 +2108,7 @@
   min-width: 14px;
   min-height: 14px;
   border: 0;
+  border-radius: 4px;
   padding: 0 2px;
   background: transparent;
   color: #8eaf24;
@@ -1916,6 +2116,10 @@
   font-size: 9px;
   font-weight: 800;
   line-height: 1;
+}
+
+.traceApp .traceSourceCitation {
+  border-radius: 4px;
 }
 
 .traceSourceCitation:hover,
@@ -2517,7 +2721,8 @@
 }
 
 .traceHistoryRun {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 7px;
   margin: 2px 0;
   border-bottom: 0;
@@ -2563,7 +2768,8 @@
 .traceHistoryRunActions {
   flex-direction: row;
   align-items: center;
-  gap: 13px;
+  justify-self: end;
+  gap: 4px;
 }
 
 .traceHistoryRunActions a,
@@ -2593,6 +2799,87 @@
 
 .traceHistoryRunActions .traceHistoryDelete {
   color: #a64231;
+}
+
+.traceHistoryRunActions a,
+.traceHistoryRunActions button {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  place-items: center;
+  border-radius: 50%;
+  padding: 0;
+  line-height: 1;
+  text-align: center;
+}
+
+.traceHistoryRunActions a:hover,
+.traceHistoryRunActions button:hover:not(:disabled) {
+  background: #dedbd2;
+}
+
+.traceHistoryRunActions .traceHistoryDelete:hover:not(:disabled) {
+  background: #f1ddd6;
+  color: #8f2f20;
+}
+
+.traceHistoryRunActions a:focus-visible,
+.traceHistoryRunActions button:focus-visible {
+  outline: 2px solid #8eaf24;
+  outline-offset: 2px;
+}
+
+.traceHistoryRunActions svg {
+  display: block;
+}
+
+.traceHistoryRunActions [data-tooltip] {
+  position: relative;
+}
+
+.traceHistoryRunActions [data-tooltip]::after {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  z-index: 20;
+  visibility: hidden;
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: #17201c;
+  box-shadow: 0 3px 10px rgb(23 32 28 / 18%);
+  color: #fffdf8;
+  content: attr(data-tooltip);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.traceHistoryRunActions [data-tooltip]:last-child::after {
+  right: 0;
+  left: auto;
+  transform: translateY(3px);
+}
+
+.traceHistoryRunActions [data-tooltip]:hover::after,
+.traceHistoryRunActions [data-tooltip]:focus-visible::after {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.traceHistoryRunActions [data-tooltip]:last-child:hover::after,
+.traceHistoryRunActions [data-tooltip]:last-child:focus-visible::after {
+  transform: translateY(0);
+}
+
+.traceHistoryActionSpinning {
+  animation: trace-search-spin 720ms linear infinite;
 }
 
 .traceHistoryMoreRuns,
@@ -2644,8 +2931,12 @@
   .traceSourceSidebar {
     position: static;
     max-width: none;
-    flex-basis: 100%;
-    padding: 0 clamp(16px, 3vw, 36px) 72px;
+    padding: 0;
+  }
+
+  .traceBriefLayout {
+    width: min(820px, 100%);
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2662,6 +2953,15 @@
     padding: 16px;
   }
 
+  .traceJob .traceTopbar {
+    min-height: 56px;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    padding: 10px 16px;
+  }
+
   .traceHome .traceTopbar {
     min-height: 56px;
     align-items: center;
@@ -2672,6 +2972,19 @@
   .traceTopbarIdentity,
   .traceTopbarActions {
     width: 100%;
+  }
+
+  .traceJob .traceTopbarIdentity {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 190px;
+    justify-content: flex-start;
+  }
+
+  .traceJob .traceTopbarActions {
+    width: auto;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
   }
 
   .traceTopbarIdentity {
@@ -2761,6 +3074,15 @@
     justify-items: start;
   }
 
+  .traceProgressStep {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .traceStepStatusPill {
+    width: max-content;
+    grid-column: 2;
+  }
+
   .traceFoundHeading,
   .traceCheckpointFallback {
     align-items: flex-start;
@@ -2777,11 +3099,22 @@
   }
 
   .traceBriefDocumentWrap {
-    padding: 24px 14px 46px;
+    padding: 0;
   }
 
   .traceBriefPaper {
     padding: 30px 22px 42px;
+  }
+
+  .traceBriefLayout {
+    padding: 24px 14px 46px;
+    gap: 18px;
+  }
+
+  .traceQuickMetadata {
+    width: 100%;
+    justify-items: start;
+    white-space: normal;
   }
 
   .traceBriefMetadata {
@@ -2832,7 +3165,7 @@
 
   .traceSourceSidebar {
     min-width: 0;
-    padding: 0 14px 46px;
+    padding: 0;
   }
 }
 
@@ -2846,6 +3179,8 @@
   .traceStepProgressRingValue,
   .traceSearchModeTooltip,
   .traceSearchBusySpinner,
+  .traceHistoryActionSpinning,
+  .traceHistoryRunActions [data-tooltip]::after,
   .traceUnifiedSearch,
   .traceCoverageTrack > span {
     animation: none;

@@ -761,33 +761,40 @@ export function TraceFootprintBrief({
                 <div className="traceBriefEyebrow">
                   {isQuick ? "Quick brief" : "Public footprint brief"}
                 </div>
-                <h1 id={titleId}>{isQuick ? brief.subject : workingSubject}</h1>
+                <h1 id={titleId}>{isQuick ? resolvedSeedLabel : workingSubject}</h1>
                 <div className="traceBriefSeed">
                   {isQuick
                     ? "no single person established"
                     : `seeded from ${resolvedSeedLabel}`}
                 </div>
               </div>
-              <dl className="traceBriefMetadata">
-                <dt>Status</dt>
-                <dd>
-                  {isQuick
-                    ? "Account-level"
-                    : sentenceCase(brief.overall_identity_status)}
-                </dd>
-                <dt>Snapshot</dt>
-                <dd>{formatDate(brief.generated_at)}</dd>
-                <dt>Sources</dt>
-                <dd>{evidence.length} cited</dd>
-                {!isQuick ? (
+              {isQuick ? (
+                <div className="traceQuickMetadata" aria-label="Brief metadata">
+                  <span className="traceBriefStatusPill">
+                    <i aria-hidden="true" />
+                    Account-level only
+                  </span>
+                  <span>
+                    {formatDate(brief.generated_at)} · {evidence.length} sources ·{" "}
+                    {brief.accounts.length} accounts
+                  </span>
+                </div>
+              ) : (
+                <dl className="traceBriefMetadata">
+                  <dt>Status</dt>
+                  <dd>{sentenceCase(brief.overall_identity_status)}</dd>
+                  <dt>Snapshot</dt>
+                  <dd>{formatDate(brief.generated_at)}</dd>
+                  <dt>Sources</dt>
+                  <dd>{evidence.length} cited</dd>
                   <>
                     <dt>Accounts</dt>
                     <dd>
                       {brief.accounts.length} assessed, {excludedCount} set aside
                     </dd>
                   </>
-                ) : null}
-              </dl>
+                </dl>
+              )}
             </header>
 
             <div className="traceBriefLead">
@@ -799,6 +806,12 @@ export function TraceFootprintBrief({
               </div>
               <aside className="traceBriefConfidence">
                 <div>Confidence</div>
+                <span className="traceConfidenceMeter" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i className={isQuick ? "" : "traceConfidenceMeterFilled"} />
+                  <i />
+                </span>
                 <strong>{confidenceLabel}</strong>
                 <p>{confidenceNote}</p>
               </aside>

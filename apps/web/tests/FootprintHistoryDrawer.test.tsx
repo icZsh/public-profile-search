@@ -78,7 +78,7 @@ async function openLoadedDrawer() {
   const user = userEvent.setup();
   render(<FootprintHistoryDrawer />);
   await user.click(screen.getByRole("button", { name: /history/i }));
-  await screen.findByText("github · @octavia");
+  await screen.findByText("@octavia");
   return user;
 }
 
@@ -193,7 +193,7 @@ describe("FootprintHistoryDrawer", () => {
       );
     });
 
-    await user.click(screen.getByRole("button", { name: /github · @octavia/i }));
+    await user.click(screen.getByRole("button", { name: /@octavia/i }));
     expect(screen.getByText("Loading runs…")).toBeInTheDocument();
     expect(apiMocks.getFootprintHistoryRuns).toHaveBeenCalledWith(
       readyRun.job_id,
@@ -206,15 +206,29 @@ describe("FootprintHistoryDrawer", () => {
 
     expect((await screen.findAllByText(/Result saved/)).length).toBe(2);
     expect(screen.getByText("Deep · gpt-5.6-luna")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "View" })[0]).toHaveAttribute(
+    const viewLink = screen.getAllByRole("link", { name: "View" })[0];
+    expect(viewLink).toHaveAttribute(
       "href",
       `/footprint/${readyRun.job_id}`,
     );
+    expect(viewLink).toHaveAttribute("data-tooltip", "View");
+    expect(viewLink.querySelector("svg")).toBeInTheDocument();
+    expect(screen.queryByText("View")).not.toBeInTheDocument();
+
+    const refreshButton = screen.getAllByRole("button", { name: "Refresh" })[0];
+    expect(refreshButton).toHaveAttribute("data-tooltip", "Refresh");
+    expect(refreshButton.querySelector("svg")).toBeInTheDocument();
+    expect(screen.queryByText("Refresh")).not.toBeInTheDocument();
+
+    const deleteButton = screen.getAllByRole("button", { name: "Delete" })[0];
+    expect(deleteButton).toHaveAttribute("data-tooltip", "Delete");
+    expect(deleteButton.querySelector("svg")).toBeInTheDocument();
+    expect(screen.queryByText("Delete")).not.toBeInTheDocument();
   });
 
   it("refreshes a selected run with a stable idempotency key and routes to it", async () => {
     const user = await openLoadedDrawer();
-    await user.click(screen.getByRole("button", { name: /github · @octavia/i }));
+    await user.click(screen.getByRole("button", { name: /@octavia/i }));
     const refreshButtons = await screen.findAllByRole("button", { name: "Refresh" });
 
     await user.click(refreshButtons[0]);
@@ -230,7 +244,7 @@ describe("FootprintHistoryDrawer", () => {
 
   it("requires confirmation before delete and clears terminal history in batches", async () => {
     const user = await openLoadedDrawer();
-    await user.click(screen.getByRole("button", { name: /github · @octavia/i }));
+    await user.click(screen.getByRole("button", { name: /@octavia/i }));
     await screen.findAllByRole("button", { name: "Delete" });
     const confirmMock = vi.spyOn(window, "confirm");
     confirmMock.mockReturnValueOnce(false);
